@@ -2,8 +2,10 @@
 /**
  * Plugin Name: WP Donation System
  * Description: A WordPress plugin for handling donations via PayPal and M-Pesa
- * Version: 1.0.0
- * Author: Your Name
+ * Version: 1.0.1
+ * Author: Victor Kariuki
+ * Author URI: https://github.com/victorKariuki
+ * Plugin URI: https://github.com/victorKariuki/wp-donation-system
  * Text Domain: wp-donation-system
  */
 
@@ -12,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WP_DONATION_SYSTEM_VERSION', '1.0.0');
+define('WP_DONATION_SYSTEM_VERSION', '1.0.1');
 define('WP_DONATION_SYSTEM_PATH', plugin_dir_path(__FILE__));
 define('WP_DONATION_SYSTEM_URL', plugin_dir_url(__FILE__));
 
@@ -37,6 +39,7 @@ require_once WP_DONATION_SYSTEM_PATH . 'admin/class-donations-list-table.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-export.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-callbacks.php';
+require_once WP_DONATION_SYSTEM_PATH . 'includes/class-updater.php';
 
 // Initialize plugin
 function wp_donation_system_init() {
@@ -46,5 +49,6 @@ function wp_donation_system_init() {
     new WP_Donation_System_Notifications();
     new WP_Donation_System_Admin();
     new WP_Donation_System_Callbacks();
+    new WP_Donation_System_Updater();
 }
 add_action('plugins_loaded', 'wp_donation_system_init');

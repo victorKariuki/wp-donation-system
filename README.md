@@ -46,8 +46,27 @@ WP Donation System provides a complete donation management solution for WordPres
 3. Enter your Consumer Key, Secret, and Shortcode in the plugin settings
 4. Test using Sandbox mode before going live
 
-## Usage
+## Updates
 
-### Basic Usage
+### Checking for Updates
+
+1. Log in to your WordPress dashboard
+2. Navigate to Plugins > Installed Plugins
+3. Look for "WP Donation System" in the list
+4. If an update is available, you'll see an "Update Available" message
+5. Click "View version x.x.x details" to see what's new
+6. Click "Update Now" to install the latest version
+
+### Automatic Updates
+
+The plugin supports WordPress automatic updates. To enable:
+
+1. Go to Dashboard > Settings > Auto Updates
+2. Find "WP Donation System" in the plugins list
+3. Toggle "Enable auto-updates"
+
+Note: Always backup your website before updating any plugins.
+
+## Usage
 
 Add the donation form to any page or post using the shortcode:

@@ -5,8 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.1] - 2024-12-02
+### Added
+- GitHub-based update system
+- Proper plugin author and URI information
+- Automatic update functionality via WordPress dashboard
+- Update notification system
+
 ### Fixed
-- Added missing include for form validator class to fix fatal error in donation form initialization
+- Added missing include for form validator class
+- Fixed plugin header information
+- Improved update mechanism reliability
+
+### Changed
+- Switched from custom update server to GitHub releases
+- Updated plugin metadata to reflect GitHub repository
+- Removed deprecated update-info.json in favor of GitHub API
 
 ## [1.0.0] - 2024-12-02
 ### Added
