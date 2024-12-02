@@ -47,13 +47,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data sanitization method in form validator
 - Filter hooks for validation and sanitization
 - Improved error messages
+- Currency handling class with formatting options
+- Error handling class with logging integration
+- Support for additional currencies (EUR, GBP)
+- Currency position formatting
+- Error message standardization
 
 ### Fixed
 - Class loading order to prevent initialization errors
 - Form validator file structure and documentation
 - Plugin file organization
+- Error handling consistency
 
 ### Changed
 - Reorganized class loading into logical groups
 - Updated validation error messages
-- Improved code documentation 
+- Improved code documentation
+- Standardized error handling across plugin
