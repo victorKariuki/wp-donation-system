@@ -1,0 +1,65 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# IDE Files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Compiled Assets
+*.min.js
+*.min.css
+*.map
+
+# WordPress Specific
+wp-config.php
+wp-content/uploads/
+wp-content/upgrade/
+wp-content/backup-db/
+wp-content/cache/
+wp-content/backups/
+
+# Plugin Specific
+donation-system-logs/
+*.log
+
+# Environment Files
+.env
+.env.*
+!.env.example
+
+# Build Files
+/dist/
+/build/
+
+# Temporary Files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Test Configuration
+phpunit.xml
+.phpunit.result.cache
+
+# Composer
+composer.phar
+/vendor/
+
+# Package Managers
+package-lock.json
+yarn.lock
+
+# Documentation
+/docs/
+
+# Backup Files
+*.bak
+*.backup
+*~ 
