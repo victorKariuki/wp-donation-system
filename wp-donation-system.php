@@ -27,6 +27,7 @@ function wp_donation_system_activate() {
 }
 
 // Load plugin classes
+require_once WP_DONATION_SYSTEM_PATH . 'includes/class-form-validator.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-donation-form.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-paypal.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-mpesa.php';
