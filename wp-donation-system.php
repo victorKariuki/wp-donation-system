@@ -28,18 +28,24 @@ function wp_donation_system_activate() {
     $database->create_tables();
 }
 
-// Load plugin classes
+// Load core classes first
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-form-validator.php';
+require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
+require_once WP_DONATION_SYSTEM_PATH . 'includes/class-error-handler.php';
+require_once WP_DONATION_SYSTEM_PATH . 'includes/class-currency.php';
+require_once WP_DONATION_SYSTEM_PATH . 'includes/class-rate-limiter.php';
+
+// Load feature classes
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-donation-form.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-paypal.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-mpesa.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-notifications.php';
-require_once WP_DONATION_SYSTEM_PATH . 'admin/class-admin.php';
-require_once WP_DONATION_SYSTEM_PATH . 'admin/class-donations-list-table.php';
-require_once WP_DONATION_SYSTEM_PATH . 'includes/class-export.php';
-require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-callbacks.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-updater.php';
+
+// Load admin classes
+require_once WP_DONATION_SYSTEM_PATH . 'admin/class-admin.php';
+require_once WP_DONATION_SYSTEM_PATH . 'admin/class-donations-list-table.php';
 
 // Initialize plugin
 function wp_donation_system_init() {
