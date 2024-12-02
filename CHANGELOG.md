@@ -40,3 +40,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CSRF protection
 - Rate limiting for payment attempts
 - Secure payment processing 
+
+## [1.0.2] - 2024-12-02
+### Added
+- Enhanced form validation with additional checks
+- Data sanitization method in form validator
+- Filter hooks for validation and sanitization
+- Improved error messages
+
+### Fixed
+- Class loading order to prevent initialization errors
+- Form validator file structure and documentation
+- Plugin file organization
+
+### Changed
+- Reorganized class loading into logical groups
+- Updated validation error messages
+- Improved code documentation 
