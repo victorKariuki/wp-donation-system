@@ -69,4 +69,38 @@ Note: Always backup your website before updating any plugins.
 
 ## Usage
 
-Add the donation form to any page or post using the shortcode:
+Add the donation form to any page or post using the shortcode: `[donation_form]`
+
+## Contributing
+
+We welcome contributions from the community! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting pull requests.
+
+### Development
+
+- [Issue Tracker](https://github.com/victorKariuki/wp-donation-system/issues)
+- [Source Code](https://github.com/victorKariuki/wp-donation-system)
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes and [CONTRIBUTING.md](CONTRIBUTING.md) for development setup instructions.
+
+## Support
+
+If you encounter any problems or have suggestions, please:
+1. Check our [Documentation](https://github.com/victorKariuki/wp-donation-system/wiki)
+2. Search the [Issues](https://github.com/victorKariuki/wp-donation-system/issues)
+3. Create a new issue if your problem persists
+
+## License
+
+This project is licensed under the GPL v2 or later - see the [LICENSE](LICENSE) file for details.
+
+## Authors
+
+* **Victor Kariuki** - *Initial work* - [victorKariuki](https://github.com/victorKariuki)
+
+See also the list of [contributors](https://github.com/victorKariuki/wp-donation-system/contributors) who participated in this project.
+
+## Acknowledgments
+
+* WordPress Plugin Development Team
+* PayPal Developer Community
+* Safaricom Developer Community
