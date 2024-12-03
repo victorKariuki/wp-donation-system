@@ -52,7 +52,7 @@ class WP_Donation_System_Form_Validator {
         // Payment method validation
         if (empty($data['payment_method'])) {
             $errors[] = __('Please select a payment method', 'wp-donation-system');
-        } elseif (!in_array($data['payment_method'], array('paypal', 'mpesa'))) {
+        } elseif (!in_array($data['payment_method'], array('mpesa'))) {
             $errors[] = __('Invalid payment method selected', 'wp-donation-system');
         }
         

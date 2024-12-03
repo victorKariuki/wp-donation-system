@@ -144,14 +144,6 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // Payment Gateway Toggle
-    $('#paypal_enabled').on('change', function() {
-        $('#paypal-settings').slideToggle(300);
-        if (!$(this).prop('checked')) {
-            // Clear PayPal fields when disabled
-            $('#paypal-settings input').val('');
-        }
-    });
 
     $('#mpesa_enabled').on('change', function() {
         $('#mpesa-settings').slideToggle(300);

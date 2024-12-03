@@ -99,9 +99,6 @@ global $donation_message, $donation_type;
                 <option value="mpesa" <?php selected(isset($_GET['payment_method']) ? $_GET['payment_method'] : '', 'mpesa'); ?>>
                     <?php _e('M-Pesa', 'wp-donation-system'); ?>
                 </option>
-                <option value="paypal" <?php selected(isset($_GET['payment_method']) ? $_GET['payment_method'] : '', 'paypal'); ?>>
-                    <?php _e('PayPal', 'wp-donation-system'); ?>
-                </option>
             </select>
 
             <input type="date" name="start_date" value="<?php echo isset($_GET['start_date']) ? esc_attr($_GET['start_date']) : ''; ?>" placeholder="<?php _e('Start Date', 'wp-donation-system'); ?>">

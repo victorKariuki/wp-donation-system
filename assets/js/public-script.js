@@ -28,9 +28,7 @@ jQuery(document).ready(function($) {
             const formData = new FormData(this);
             const paymentMethod = formData.get('payment_method');
             
-            if (paymentMethod === 'paypal') {
-                processPayPalPayment(formData);
-            } else if (paymentMethod === 'mpesa') {
+            if (paymentMethod === 'mpesa') {
                 processMPesaPayment(formData);
             }
         }

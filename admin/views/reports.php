@@ -23,13 +23,6 @@ $total_amount = $wpdb->get_var(
     )
 );
 
-$paypal_donations = $wpdb->get_var(
-    $wpdb->prepare(
-        "SELECT COUNT(*) FROM {$wpdb->prefix}donations WHERE payment_method = %s",
-        'paypal'
-    )
-);
-
 $mpesa_donations = $wpdb->get_var(
     $wpdb->prepare(
         "SELECT COUNT(*) FROM {$wpdb->prefix}donations WHERE payment_method = %s",
@@ -66,11 +59,6 @@ $recent_donations = $wpdb->get_results(
                 echo esc_html($currency->format_amount($total_amount ?? 0));
                 ?>
             </p>
-        </div>
-
-        <div class="stat-box">
-            <h3><?php _e('PayPal Donations', 'wp-donation-system'); ?></h3>
-            <p class="stat-number"><?php echo esc_html($paypal_donations); ?></p>
         </div>
 
         <div class="stat-box">
