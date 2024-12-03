@@ -53,7 +53,19 @@
                     <input type="text" id="mpesa_shortcode" name="mpesa_shortcode" 
                         value="<?php echo esc_attr(get_setting_value($settings, 'mpesa_shortcode')); ?>" 
                         class="regular-text">
-                    <p class="description"><?php _e('Your Paybill or Till Number', 'wp-donation-system'); ?></p>
+                    <p class="description"><?php _e('Your M-Pesa API Shortcode', 'wp-donation-system'); ?></p>
+                </td>
+            </tr>
+
+            <tr>
+                <th scope="row">
+                    <label for="mpesa_number"><?php _e('Business Number', 'wp-donation-system'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="mpesa_number" name="mpesa_number" 
+                        value="<?php echo esc_attr(get_setting_value($settings, 'mpesa_number')); ?>" 
+                        class="regular-text">
+                    <p class="description"><?php _e('Your Paybill or Till Number that customers will use', 'wp-donation-system'); ?></p>
                 </td>
             </tr>
 
@@ -142,7 +154,7 @@
                                 <input type="url" 
                                     id="<?php echo esc_attr($key); ?>" 
                                     name="<?php echo esc_attr($key); ?>" 
-                                    value="<?php echo esc_url(get_setting_value($settings, $key, $default_url)); ?>" 
+                                    value="<?php echo esc_url($default_url); ?>" 
                                     class="regular-text"
                                     readonly>
                                 <button type="button" class="button copy-url" data-clipboard-target="#<?php echo esc_attr($key); ?>">

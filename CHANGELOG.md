@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Detailed M-Pesa gateway logging system
 - Callback URL validation and sanitization
 - M-Pesa transaction status tracking
+- M-Pesa credentials test functionality
+- Real-time test transaction status checking
+- Minimal test amount transaction support
+- Debug tab with M-Pesa testing tools
+- Real-time test transaction monitoring
+- Improved test feedback system
 - Comprehensive uninstall routine
 - Safe data removal options
 - Cleanup of all plugin artifacts
@@ -17,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Detailed activation error handling
 - Uninstallation error tracking
 - Fallback error logging
+- Comprehensive callback data processing
+- Payment confirmation notifications
+- Detailed transaction metadata storage
 
 ### Removed
 - PayPal gateway integration (temporary)
@@ -43,6 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved database table creation process
 - Enhanced activation error logging
 - Database table verification after creation
+- M-Pesa credentials validation
+- Access token error handling
+- Credential verification in settings
+- Callback data validation
+- Payment status updates
+- Notification delivery
 
 ### Changed
 - Improved M-Pesa gateway initialization
@@ -51,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refined M-Pesa API response handling
 - Moved M-Pesa class to gateways directory
 - Organized directory structure
+- Enhanced credential validation process
+- Improved callback response handling
+- Enhanced notification system
 
 ### Security
 - Input sanitization and validation

@@ -34,6 +34,9 @@ $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'general';
         <a href="#advanced" class="nav-tab <?php echo $active_tab === 'advanced' ? 'nav-tab-active' : ''; ?>" data-tab="advanced">
             <?php _e('Advanced', 'wp-donation-system'); ?>
         </a>
+        <a href="#test" class="nav-tab <?php echo $active_tab === 'test' ? 'nav-tab-active' : ''; ?>" data-tab="test">
+            <?php _e('Test Gateway', 'wp-donation-system'); ?>
+        </a>
         <?php if (WP_DEBUG): ?>
             <a href="#debug" class="nav-tab <?php echo $active_tab === 'debug' ? 'nav-tab-active' : ''; ?>" data-tab="debug">
                 <?php _e('Debug', 'wp-donation-system'); ?>
@@ -145,6 +148,11 @@ $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'general';
         <!-- Advanced Settings Panel -->
         <div id="advanced" class="settings-panel" style="<?php echo $active_tab === 'advanced' ? 'display: block;' : 'display: none;'; ?>">
             <?php include WP_DONATION_SYSTEM_PATH . 'admin/views/settings/advanced.php'; ?>
+        </div>
+
+        <!-- Test Gateway Panel -->
+        <div id="test" class="settings-panel" style="<?php echo $active_tab === 'test' ? 'display: block;' : 'display: none;'; ?>">
+            <?php include WP_DONATION_SYSTEM_PATH . 'admin/views/settings/test.php'; ?>
         </div>
 
         <!-- Debug Panel -->

@@ -1,12 +1,17 @@
 <?php
 /**
  * Plugin Name: WP Donation System
- * Description: A WordPress plugin for handling donations via M-Pesa
+ * Plugin URI: https://github.com/victorKariuki/wp-donation-system
+ * Description: A secure and reliable WordPress plugin for processing donations via M-Pesa mobile payments. Features include donation tracking, reporting, and automated payment processing.
  * Version: 1.0.1
+ * Requires at least: 5.0
+ * Requires PHP: 7.2
  * Author: Victor Kariuki
  * Author URI: https://github.com/victorKariuki
- * Plugin URI: https://github.com/victorKariuki/wp-donation-system
+ * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: wp-donation-system
+ * Domain Path: /languages
  */
 
 if (!defined('ABSPATH')) {

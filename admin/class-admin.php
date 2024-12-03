@@ -33,6 +33,7 @@ class WP_Donation_System_Admin {
             'mpesa_consumer_key' => '',
             'mpesa_consumer_secret' => '',
             'mpesa_shortcode' => '',
+            'mpesa_number' => '',
             'test_mode' => true,
             'default_currency' => 'USD',
             'email_notifications' => true,
@@ -71,6 +72,11 @@ class WP_Donation_System_Admin {
         add_action('wp_ajax_save_donation_settings', array($this, 'ajax_save_settings'));
         add_action('wp_ajax_get_donation_logs', array($this, 'get_donation_logs'));
         add_action('wp_ajax_clear_donation_logs', array($this, 'clear_donation_logs'));
+        add_action('wp_ajax_test_mpesa_credentials', array($this, 'test_mpesa_credentials'));
+        add_action('wp_ajax_check_test_transaction_status', array($this, 'check_test_transaction_status'));
+
+        // Add script enqueuing
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
     }
 
     /**
@@ -456,7 +462,7 @@ class WP_Donation_System_Admin {
         if ($settings['mpesa_enabled']) {
             $mpesa_fields = array(
                 'env', 'type', 'shortcode', 'consumer_key', 'consumer_secret',
-                'passkey', 'account_ref', 'transaction_desc'
+                'passkey', 'account_ref', 'transaction_desc', 'number'
             );
             foreach ($mpesa_fields as $field) {
                 $key = 'mpesa_' . $field;
@@ -473,11 +479,22 @@ class WP_Donation_System_Admin {
                     throw new Exception(sprintf(__('%s is required for M-Pesa integration.', 'wp-donation-system'), $field));
                 }
             }
+
+            // Test credentials if in sandbox mode
+            if ($settings['mpesa_env'] === 'sandbox') {
+                require_once WP_DONATION_SYSTEM_PATH . 'includes/gateways/class-mpesa.php';
+                $mpesa = new WP_Donation_System_MPesa();
+                $test_token = $mpesa->get_access_token();
+                
+                if (!$test_token) {
+                    throw new Exception(__('Invalid M-Pesa credentials. Please verify your Consumer Key and Secret.', 'wp-donation-system'));
+                }
+            }
         } else {
             // Clear M-Pesa settings when disabled
             $mpesa_fields = array(
                 'env', 'type', 'shortcode', 'consumer_key', 'consumer_secret',
-                'passkey', 'account_ref', 'transaction_desc'
+                'passkey', 'account_ref', 'transaction_desc', 'number'
             );
             foreach ($mpesa_fields as $field) {
                 $settings['mpesa_' . $field] = '';
@@ -534,23 +551,23 @@ class WP_Donation_System_Admin {
      * Get logs via AJAX
      */
     public function get_donation_logs() {
-        check_ajax_referer('wp_donation_system_logs', 'security');
+        check_ajax_referer('wp_donation_system_admin', 'security');
         
         if (!current_user_can('manage_options')) {
             wp_send_json_error(__('Unauthorized access', 'wp-donation-system'));
         }
         
         $logger = new WP_Donation_System_Logger();
-        $logs = $logger->get_logs([
+        $logs_data = $logger->get_logs([
             'level' => $_POST['level'] ?? '',
             'start_date' => $_POST['start_date'] ?? '',
             'end_date' => $_POST['end_date'] ?? '',
-            'limit' => 50
-        ]);
+            'page' => intval($_POST['page'] ?? 1),
+            'per_page' => intval($_POST['per_page'] ?? 20)
+        ], true);
         
         ob_start();
-        foreach ($logs as $log) {
-            // Safely decode context
+        foreach ($logs_data['logs'] as $log) {
             $context = !empty($log->context) ? json_decode($log->context) : null;
             ?>
             <tr class="log-entry log-level-<?php echo esc_attr($log->level); ?>">
@@ -559,7 +576,9 @@ class WP_Donation_System_Admin {
                 <td><?php echo esc_html($log->message); ?></td>
                 <td>
                     <?php if ($context && !empty((array)$context)): ?>
-                        <button class="button-link toggle-context"><?php _e('Show Details', 'wp-donation-system'); ?></button>
+                        <button type="button" class="button-link toggle-context" role="button">
+                            <?php _e('Show Details', 'wp-donation-system'); ?>
+                        </button>
                         <div class="context-data hidden">
                             <pre><?php echo esc_html(json_encode($context, JSON_PRETTY_PRINT)); ?></pre>
                         </div>
@@ -572,7 +591,18 @@ class WP_Donation_System_Admin {
         }
         $html = ob_get_clean();
         
-        wp_send_json_success(['html' => $html]);
+        wp_send_json_success([
+            'html' => $html,
+            'pagination' => [
+                'total_pages' => $logs_data['total_pages'],
+                'current_page' => $logs_data['current_page'],
+                'total' => $logs_data['total'],
+                'total_text' => sprintf(
+                    _n('%s item', '%s items', $logs_data['total'], 'wp-donation-system'),
+                    number_format_i18n($logs_data['total'])
+                )
+            ]
+        ]);
     }
     
     /**
@@ -598,5 +628,136 @@ class WP_Donation_System_Admin {
 
         $logs = $this->logger->get_logs('mpesa', 100); // Get last 100 M-Pesa related logs
         include WP_DONATION_SYSTEM_PATH . 'admin/views/mpesa-logs.php';
+    }
+
+    /**
+     * Test M-Pesa credentials
+     */
+    public function test_mpesa_credentials() {
+        try {
+            check_ajax_referer('wp_donation_system_admin', 'security');
+
+            if (!current_user_can('manage_options')) {
+                throw new Exception(__('Unauthorized access', 'wp-donation-system'));
+            }
+
+            $phone_number = sanitize_text_field($_POST['phone_number'] ?? '');
+            if (empty($phone_number)) {
+                throw new Exception(__('Phone number is required', 'wp-donation-system'));
+            }
+
+            require_once WP_DONATION_SYSTEM_PATH . 'includes/gateways/class-mpesa.php';
+            $mpesa = new WP_Donation_System_MPesa();
+            $result = $mpesa->test_credentials($phone_number);
+
+            if (!$result['success']) {
+                throw new Exception($result['message']);
+            }
+
+            // Store the checkout request ID for status checking
+            set_transient('mpesa_test_transaction_' . get_current_user_id(), $result['checkout_request_id'], 5 * MINUTE_IN_SECONDS);
+
+            wp_send_json_success([
+                'message' => $result['message'],
+                'checkout_request_id' => $result['checkout_request_id']
+            ]);
+
+        } catch (Exception $e) {
+            wp_send_json_error([
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Check test transaction status
+     */
+    public function check_test_transaction_status() {
+        try {
+            check_ajax_referer('wp_donation_system_admin', 'security');
+
+            if (!current_user_can('manage_options')) {
+                throw new Exception(__('Unauthorized access', 'wp-donation-system'));
+            }
+
+            $checkout_request_id = get_transient('mpesa_test_transaction_' . get_current_user_id());
+            if (!$checkout_request_id) {
+                throw new Exception(__('Test transaction not found or expired', 'wp-donation-system'));
+            }
+
+            global $wpdb;
+            $donation = $wpdb->get_row($wpdb->prepare(
+                "SELECT id, status, notes, transaction_id, metadata FROM {$wpdb->prefix}donations WHERE checkout_request_id = %s",
+                $checkout_request_id
+            ));
+
+            if (!$donation) {
+                wp_send_json_success(['status' => 'pending']);
+            }
+
+            $metadata = json_decode($donation->metadata, true);
+            $response_data = [
+                'status' => $donation->status,
+                'message' => $donation->notes,
+                'is_test' => !empty($metadata['test_transaction']),
+                'transaction_id' => $donation->transaction_id
+            ];
+
+            // Add additional details for completed transactions
+            if ($donation->status === 'completed') {
+                $response_data['success_message'] = sprintf(
+                    __('Test transaction successful! Transaction ID: %s', 'wp-donation-system'),
+                    $donation->transaction_id
+                );
+            }
+
+            // Add failure details
+            if ($donation->status === 'failed') {
+                $response_data['error_details'] = $donation->notes;
+            }
+
+            wp_send_json_success($response_data);
+
+        } catch (Exception $e) {
+            wp_send_json_error([
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
+
+    public function enqueue_admin_scripts($hook) {
+        // Only load on our plugin's pages
+        if (strpos($hook, 'wp-donation-system') === false) {
+            return;
+        }
+
+        wp_enqueue_script(
+            'wp-donation-system-admin',
+            WP_DONATION_SYSTEM_URL . 'admin/js/admin.js',
+            array('jquery', 'wp-util'),
+            WP_DONATION_SYSTEM_VERSION,
+            true
+        );
+        
+        wp_localize_script('wp-donation-system-admin', 'wp_donation_system', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('wp_donation_system_admin'),
+            'strings' => array(
+                'confirm_delete' => __('Are you sure you want to delete this donation?', 'wp-donation-system'),
+                'saving' => __('Saving...', 'wp-donation-system'),
+                'saved' => __('Settings saved successfully.', 'wp-donation-system'),
+                'error' => __('An error occurred.', 'wp-donation-system'),
+                'test_success' => __('Test transaction successful!', 'wp-donation-system'),
+                'test_failed' => __('Test transaction failed.', 'wp-donation-system'),
+                'checking_status' => __('Checking payment status...', 'wp-donation-system'),
+                'network_error' => __('Network error occurred', 'wp-donation-system'),
+                'confirm_clear_logs' => __('Are you sure you want to clear all logs? This cannot be undone.', 'wp-donation-system'),
+                'transaction_id' => __('Transaction ID', 'wp-donation-system'),
+                'test_timeout' => __('Test transaction timed out. Please check logs for details.', 'wp-donation-system')
+            )
+        ));
+
+        // Add dashicons for the test interface
+        wp_enqueue_style('dashicons');
     }
 }

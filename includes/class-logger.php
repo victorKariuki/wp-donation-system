@@ -78,20 +78,20 @@ class WP_Donation_System_Logger {
      * @param array $args Query arguments
      * @return array Log entries
      */
-    public function get_logs($args = array()) {
+    public function get_logs($args = array(), $paginate = false) {
         global $wpdb;
         
         $defaults = array(
             'level' => '',
-            'limit' => 100,
-            'offset' => 0,
-            'order' => 'DESC',
             'start_date' => '',
-            'end_date' => ''
+            'end_date' => '',
+            'per_page' => 20,
+            'page' => 1,
+            'orderby' => 'timestamp',
+            'order' => 'DESC'
         );
         
         $args = wp_parse_args($args, $defaults);
-        
         $where = array('1=1');
         $values = array();
         
@@ -107,18 +107,59 @@ class WP_Donation_System_Logger {
         
         if (!empty($args['end_date'])) {
             $where[] = 'timestamp <= %s';
-            $values[] = $args['end_date'];
+            $values[] = $args['end_date'] . ' 23:59:59';
         }
         
-        $query = $wpdb->prepare(
-            "SELECT * FROM {$this->table_name} 
-            WHERE " . implode(' AND ', $where) . "
-            ORDER BY timestamp {$args['order']}
-            LIMIT %d OFFSET %d",
-            array_merge($values, array($args['limit'], $args['offset']))
-        );
+        // Count total records for pagination
+        if (!empty($values)) {
+            $total = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$this->table_name} WHERE " . implode(' AND ', $where),
+                $values
+            ));
+        } else {
+            $total = $wpdb->get_var("SELECT COUNT(*) FROM {$this->table_name} WHERE 1=1");
+        }
         
-        return $wpdb->get_results($query);
+        // Calculate pagination
+        $offset = ($args['page'] - 1) * $args['per_page'];
+        $total_pages = ceil($total / $args['per_page']);
+        
+        $orderby = sanitize_sql_orderby($args['orderby'] . ' ' . $args['order']);
+        $base_query = "SELECT * FROM {$this->table_name} WHERE " . implode(' AND ', $where);
+        
+        if ($paginate) {
+            if (!empty($values)) {
+                $query = $wpdb->prepare(
+                    $base_query . " ORDER BY {$orderby} LIMIT %d OFFSET %d",
+                    array_merge($values, array($args['per_page'], $offset))
+                );
+            } else {
+                $query = $wpdb->prepare(
+                    "SELECT * FROM {$this->table_name} WHERE 1=1 ORDER BY {$orderby} LIMIT %d OFFSET %d",
+                    array($args['per_page'], $offset)
+                );
+            }
+        } else {
+            if (!empty($values)) {
+                $query = $wpdb->prepare($base_query . " ORDER BY {$orderby}", $values);
+            } else {
+                $query = "SELECT * FROM {$this->table_name} WHERE 1=1 ORDER BY {$orderby}";
+            }
+        }
+        
+        $logs = $wpdb->get_results($query);
+        
+        if ($paginate) {
+            return array(
+                'logs' => $logs,
+                'total' => $total,
+                'total_pages' => $total_pages,
+                'current_page' => $args['page'],
+                'per_page' => $args['per_page']
+            );
+        }
+        
+        return $logs;
     }
     
     /**
