@@ -21,36 +21,62 @@ class WP_Donation_System_Database {
      * Create plugin database tables
      */
     public function create_tables() {
-        global $wpdb;
-        $charset_collate = $wpdb->get_charset_collate();
-
-        // Donations table
-        $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}donations (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            donor_name varchar(100) NOT NULL,
-            donor_email varchar(100) NOT NULL,
-            donor_phone varchar(20),
-            amount decimal(10,2) NOT NULL,
-            currency varchar(3) NOT NULL DEFAULT 'USD',
-            payment_method varchar(20) NOT NULL,
-            status varchar(20) NOT NULL DEFAULT 'pending',
-            transaction_id varchar(100),
-            checkout_request_id varchar(100),
-            merchant_request_id varchar(100),
-            mpesa_receipt_number varchar(50),
-            notes text,
-            metadata longtext,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            KEY donor_email (donor_email),
-            KEY status (status),
-            KEY payment_method (payment_method),
-            KEY created_at (created_at)
-        ) $charset_collate;";
-
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
+        try {
+            global $wpdb;
+            $charset_collate = $wpdb->get_charset_collate();
+            
+            // Log the attempt to create tables
+            error_log('WP Donation System: Attempting to create database tables');
+            
+            // Donations table
+            $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}donations (
+                id bigint(20) NOT NULL AUTO_INCREMENT,
+                donor_name varchar(100) NOT NULL,
+                donor_email varchar(100) NOT NULL,
+                donor_phone varchar(20),
+                amount decimal(10,2) NOT NULL,
+                currency varchar(3) NOT NULL DEFAULT 'USD',
+                payment_method varchar(20) NOT NULL,
+                status varchar(20) NOT NULL DEFAULT 'pending',
+                transaction_id varchar(100),
+                checkout_request_id varchar(100),
+                merchant_request_id varchar(100),
+                mpesa_receipt_number varchar(50),
+                notes text,
+                metadata longtext,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY  (id),
+                KEY donor_email (donor_email),
+                KEY status (status),
+                KEY payment_method (payment_method),
+                KEY created_at (created_at)
+            ) $charset_collate;";
+            
+            // Check if we have dbDelta
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+            
+            // Execute dbDelta and capture results
+            $results = dbDelta($sql);
+            
+            // Log the results
+            error_log('WP Donation System: Database creation results: ' . print_r($results, true));
+            
+            // Verify table exists
+            $table_name = $wpdb->prefix . 'donations';
+            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+            
+            if (!$table_exists) {
+                throw new Exception("Failed to create table: $table_name");
+            }
+            
+            return true;
+            
+        } catch (Exception $e) {
+            error_log('WP Donation System: Database creation failed: ' . $e->getMessage());
+            error_log('WP Donation System: ' . $e->getTraceAsString());
+            throw $e;
+        }
     }
 
     /**

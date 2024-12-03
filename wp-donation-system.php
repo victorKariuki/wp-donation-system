@@ -41,27 +41,38 @@ function wp_donation_system_activate() {
             }
         }
 
+        // Check database permissions
+        global $wpdb;
+        $test_table = $wpdb->prefix . 'wp_donation_system_test';
+        $test_result = $wpdb->query("CREATE TABLE IF NOT EXISTS {$test_table} (id int(11) NOT NULL) ENGINE=InnoDB");
+        
+        if ($test_result === false) {
+            throw new Exception('Database creation permission denied. Please check your database permissions.');
+        }
+        
+        $wpdb->query("DROP TABLE IF EXISTS {$test_table}");
+
         // Create necessary database tables
         require_once WP_DONATION_SYSTEM_PATH . 'includes/class-database.php';
         $database = new WP_Donation_System_Database();
-        $tables_created = $database->create_tables();
-        if (!$tables_created) {
-            throw new Exception('Failed to create database tables.');
+        try {
+            $database->create_tables();
+        } catch (Exception $e) {
+            throw new Exception('Failed to create database tables: ' . $e->getMessage());
         }
         
-        $tables_updated = $database->update_tables();
-        if (!$tables_updated) {
-            throw new Exception('Failed to update database tables.');
-        }
-
-        // Create required directories
+        // Create required directories with proper permissions
         $upload_dir = wp_upload_dir();
         $plugin_dir = $upload_dir['basedir'] . '/wp-donation-system';
         $logs_dir = $plugin_dir . '/logs';
 
         if (!wp_mkdir_p($logs_dir)) {
-            throw new Exception('Failed to create logs directory.');
+            throw new Exception('Failed to create required directories.');
         }
+
+        // Set proper directory permissions
+        chmod($plugin_dir, 0755);
+        chmod($logs_dir, 0755);
 
         // Create .htaccess to protect logs
         $htaccess_content = "Order deny,allow\nDeny from all";
@@ -69,24 +80,14 @@ function wp_donation_system_activate() {
             throw new Exception('Failed to create .htaccess file.');
         }
 
-        // Initialize logger and log successful activation
-        require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
-        $logger = new WP_Donation_System_Logger();
-        $logger->log('Plugin activated successfully', 'info', [
-            'version' => WP_DONATION_SYSTEM_VERSION,
-            'php_version' => PHP_VERSION,
-            'wp_version' => get_bloginfo('version')
-        ]);
+        // Set initial options
+        add_option('wp_donation_system_version', WP_DONATION_SYSTEM_VERSION);
+        add_option('wp_donation_system_db_version', '1.0.0');
+        add_option('wp_donation_system_installed', current_time('mysql'));
 
     } catch (Exception $e) {
-        // Log the error if logger is available
-        if (class_exists('WP_Donation_System_Logger')) {
-            $logger = new WP_Donation_System_Logger();
-            $logger->log('Activation failed', 'error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-        }
+        error_log('WP Donation System activation failed: ' . $e->getMessage());
+        error_log('WP Donation System activation stack trace: ' . $e->getTraceAsString());
 
         // Deactivate the plugin
         deactivate_plugins(plugin_basename(__FILE__));

@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Corrected gateway file paths
 - Plugin cleanup on uninstall
 - Installation and uninstallation error handling
+- Database creation permissions check
+- Improved database table creation process
+- Enhanced activation error logging
+- Database table verification after creation
 
 ### Changed
 - Improved M-Pesa gateway initialization
