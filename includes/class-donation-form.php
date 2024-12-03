@@ -1,66 +1,96 @@
 <?php
 class WP_Donation_System_Form {
-    private $validator;
+    private $settings;
+    private $currency;
 
     public function __construct() {
-        $this->validator = new WP_Donation_System_Form_Validator();
         add_shortcode('donation_form', array($this, 'render_donation_form'));
+        $this->settings = get_option('wp_donation_system_settings', array());
+        
+        // Initialize currency class
+        require_once WP_DONATION_SYSTEM_PATH . 'includes/class-currency.php';
+        $this->currency = new WP_Donation_System_Currency();
+        
+        // Add script enqueuing
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
     }
 
-    public function render_donation_form() {
+    /**
+     * Helper function to get setting value
+     */
+    private function get_setting_value($key, $default = '') {
+        return isset($this->settings[$key]) ? $this->settings[$key] : $default;
+    }
+
+    /**
+     * Render donation form
+     */
+    public function render_donation_form($atts = array(), $content = null, $tag = '') {
+        // Ensure scripts are enqueued
+        wp_enqueue_script('wp-donation-system');
+        wp_enqueue_style('wp-donation-system');
+
+        // Start output buffering
         ob_start();
+
+        // Make settings and helper function available to template
+        $settings = $this->settings;
+        $currency = $this->currency;
+        $get_setting_value = array($this, 'get_setting_value');
+        $default_currency = $this->get_setting_value('default_currency', 'USD');
+        $min_amount = $this->get_setting_value('donation_minimum', 5);
+        $max_amount = $this->get_setting_value('donation_maximum', 10000);
+
+        // Include the template
         include WP_DONATION_SYSTEM_PATH . 'templates/donation-form.php';
+
+        // Return the buffered content
         return ob_get_clean();
     }
 
+    /**
+     * Enqueue necessary scripts and styles
+     */
     public function enqueue_scripts() {
-        wp_enqueue_style('wp-donation-system', WP_DONATION_SYSTEM_URL . 'assets/css/public-style.css');
-        wp_enqueue_script('wp-donation-system', WP_DONATION_SYSTEM_URL . 'assets/js/public-script.js', array('jquery'), false, true);
+        // Enqueue styles
+        wp_enqueue_style(
+            'wp-donation-system',
+            WP_DONATION_SYSTEM_URL . 'assets/css/public-style.css',
+            array(),
+            WP_DONATION_SYSTEM_VERSION
+        );
+
+        // Enqueue jQuery and our script
+        wp_enqueue_script(
+            'wp-donation-system',
+            WP_DONATION_SYSTEM_URL . 'assets/js/donation-form.js',
+            array('jquery'),
+            WP_DONATION_SYSTEM_VERSION,
+            true
+        );
+
+        // Localize script
+        $this->localize_script();
+    }
+
+    public function localize_script() {
         wp_localize_script('wp-donation-system', 'wpDonationSystem', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('wp_donation_system_nonce')
+            'nonce' => wp_create_nonce('wp_donation_system'),
+            'i18n' => array(
+                'invalid_amount' => __('Please enter a valid donation amount.', 'wp-donation-system'),
+                'amount_range' => __('Please enter an amount between {min} and {max}.', 'wp-donation-system'),
+                'required_field' => __('This field is required.', 'wp-donation-system'),
+                'invalid_email' => __('Please enter a valid email address.', 'wp-donation-system'),
+                'select_payment' => __('Please select a payment method.', 'wp-donation-system'),
+                'invalid_phone' => __('Please enter a valid M-Pesa phone number starting with 254.', 'wp-donation-system'),
+                'processing' => __('Processing...', 'wp-donation-system'),
+                'donate' => __('Complete Donation', 'wp-donation-system'),
+                'error' => __('An error occurred. Please try again.', 'wp-donation-system'),
+                'waiting_payment' => __('Waiting for payment...', 'wp-donation-system'),
+                'payment_timeout' => __('Payment timeout. Please try again.', 'wp-donation-system'),
+                'retry_payment' => __('Retry Payment', 'wp-donation-system'),
+            )
         ));
-    }
-
-    public function process_form() {
-        check_ajax_referer('wp_donation_system_nonce', 'nonce');
-
-        $form_data = $this->sanitize_form_data($_POST);
-        $validation = $this->validator->validate($form_data);
-
-        if ($validation !== true) {
-            wp_send_json_error(array(
-                'message' => implode('<br>', $validation)
-            ));
-        }
-
-        // Process payment based on method
-        $payment_method = $form_data['payment_method'];
-        if ($payment_method === 'paypal') {
-            $paypal = new WP_Donation_System_PayPal();
-            $result = $paypal->process_payment($form_data);
-        } elseif ($payment_method === 'mpesa') {
-            $mpesa = new WP_Donation_System_MPesa();
-            $result = $mpesa->process_payment($form_data);
-        }
-
-        if (is_wp_error($result)) {
-            wp_send_json_error(array(
-                'message' => $result->get_error_message()
-            ));
-        }
-
-        wp_send_json_success($result);
-    }
-
-    private function sanitize_form_data($data) {
-        return array(
-            'donor_name' => sanitize_text_field($data['donor_name']),
-            'donor_email' => sanitize_email($data['donor_email']),
-            'amount' => floatval($data['amount']),
-            'payment_method' => sanitize_text_field($data['payment_method']),
-            'phone' => isset($data['phone']) ? sanitize_text_field($data['phone']) : ''
-        );
     }
 }

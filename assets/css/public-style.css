@@ -1,146 +1,898 @@
+/* Typography System */
+:root {
+    /* Font Family */
+    --font-primary: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    
+    /* Font Sizes */
+    --text-xs: 12px;
+    --text-sm: 14px;
+    --text-base: 16px;
+    --text-lg: 18px;
+    --text-xl: 20px;
+    --text-2xl: 24px;
+    
+    /* Font Weights */
+    --font-normal: 400;
+    --font-medium: 500;
+    --font-semibold: 600;
+    --font-bold: 700;
+    
+    /* Line Heights */
+    --leading-tight: 1.2;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.625;
+}
+
+/* Base Typography */
 .wp-donation-form {
-    max-width: 600px;
-    margin: 2em auto;
-    padding: 30px;
-    background: #fff;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
+    font-family: var(--font-primary);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-.form-group {
-    margin-bottom: 1.5em;
+/* Headings */
+.form-section h2 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-tight);
+    color: #1e293b;
+    margin-bottom: 24px;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 0.5em;
-    font-weight: 600;
-    color: #2c3338;
-}
-
-.form-group input,
-.form-group select {
-    width: 100%;
-    padding: 12px;
-    border: 2px solid #ddd;
-    border-radius: 4px;
-    font-size: 16px;
-    transition: border-color 0.3s ease;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-    border-color: #0073aa;
-    outline: none;
-    box-shadow: 0 0 5px rgba(0, 115, 170, 0.2);
-}
-
-.payment-methods {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 1.5em;
-}
-
-.payment-method-option {
-    flex: 1;
-    text-align: center;
-    padding: 15px;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.payment-method-option.active {
-    border-color: #0073aa;
-    background: #f0f9ff;
-}
-
-.payment-method-option img {
-    height: 40px;
+/* Labels */
+.form-group label,
+.input-group label {
+    font-size: var(--text-base);
+    font-weight: var(--font-medium);
+    color: #1e293b;
     margin-bottom: 8px;
 }
 
-.donate-button {
-    width: 100%;
-    padding: 15px;
-    background: #0073aa;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 18px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+/* Input Text */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="number"] {
+    font-family: var(--font-primary);
+    font-size: var(--text-base);
+    font-weight: var(--font-normal);
 }
 
-.donate-button:hover {
-    background: #005177;
+/* Amount Presets */
+.amount-preset {
+    font-size: var(--text-base);
+    font-weight: var(--font-semibold);
 }
 
-.donate-button:disabled {
-    background: #ccc;
-    cursor: not-allowed;
+/* Currency Symbol */
+.currency-symbol {
+    font-family: var(--font-primary);
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
 }
 
-.loading {
+/* Amount Input */
+input[type="number"]#donation_amount {
+    font-family: var(--font-primary);
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+}
+
+/* Helper Text */
+.input-hint,
+.amount-hint {
+    font-size: var(--text-sm);
+    font-weight: var(--font-normal);
+    color: #64748b;
+}
+
+/* Error Messages */
+.error-message {
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+}
+
+/* Payment Method */
+.method-name {
+    font-size: var(--text-base);
+    font-weight: var(--font-semibold);
+}
+
+/* Buttons */
+.primary-button,
+.secondary-button {
+    font-family: var(--font-primary);
+    font-size: var(--text-base);
+    font-weight: var(--font-semibold);
+}
+
+/* Progress Steps */
+.step-circle {
+    font-size: var(--text-base);
+    font-weight: var(--font-semibold);
+}
+
+.step-label {
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+}
+
+/* Test Mode Notice */
+.test-mode-notice {
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+}
+
+/* Mobile Adjustments */
+@media screen and (max-width: 640px) {
+    .wp-donation-form {
+        font-size: var(--text-sm);
+    }
+
+    .form-section h2 {
+        font-size: var(--text-lg);
+    }
+
+    input[type="number"]#donation_amount {
+        font-size: var(--text-base);
+    }
+
+    .amount-preset {
+        font-size: var(--text-sm);
+    }
+
+    .currency-symbol {
+        font-size: var(--text-base);
+    }
+
+    .step-circle {
+        font-size: var(--text-sm);
+    }
+
+    .step-label {
+        font-size: var(--text-xs);
+    }
+}
+
+/* Main Container */
+.wp-donation-form {
+    max-width: 600px;
+    margin: 40px auto;
+    padding: 40px;
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* Test Mode Notice */
+.test-mode-notice {
+    background: #fff3e0;
+    border-left: 4px solid #ff9800;
+    padding: 12px 16px;
+    margin-bottom: 30px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #e65100;
+}
+
+/* Progress Steps */
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 40px;
     position: relative;
-    opacity: 0.7;
+    padding: 0 20px;
 }
 
-.loading::after {
+.progress-steps::before {
     content: '';
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 20px;
-    height: 20px;
-    margin: -10px 0 0 -10px;
-    border: 3px solid #fff;
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+    top: 20px;
+    left: 50px;
+    right: 50px;
+    height: 2px;
+    background: #e2e8f0;
+    z-index: 0;
 }
 
-.donation-message {
-    padding: 15px;
-    margin-bottom: 20px;
-    border-radius: 4px;
+.step {
+    position: relative;
+    z-index: 1;
     text-align: center;
 }
 
+.step-circle {
+    width: 40px;
+    height: 40px;
+    background: #f1f5f9;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 8px;
+    font-weight: 600;
+    color: #64748b;
+    transition: all 0.3s ease;
+}
+
+.step.active .step-circle {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.step.completed .step-circle {
+    background: #10b981;
+    color: #ffffff;
+}
+
+.step-label {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* Form Sections */
+.form-section {
+    margin-bottom: 30px;
+}
+
+/* Amount Selection Improvements */
+.amount-presets {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 30px;
+}
+
+.amount-preset {
+    padding: 16px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.amount-preset:hover {
+    border-color: #2563eb;
+    background: #f8fafc;
+    transform: translateY(-1px);
+}
+
+.amount-preset.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+}
+
+.amount-preset.custom {
+    background: #f8fafc;
+    border-style: dashed;
+}
+
+.amount-preset.custom.active {
+    background: #2563eb;
+    border-style: solid;
+}
+
+/* Amount Input Styling - Reduce Size */
+.amount-input-wrapper {
+    position: relative;
+    max-width: 200px;
+    margin-top: 20px;
+}
+
+.amount-input {
+    position: relative;
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 4px;
+    transition: all 0.2s ease;
+}
+
+.amount-input:focus-within {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.currency-symbol {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #64748b;
+    font-weight: 600;
+    font-size: 16px;
+    pointer-events: none;
+}
+
+input[type="number"]#donation_amount {
+    width: 100%;
+    padding: 12px 12px 12px 40px;
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    text-align: left;
+}
+
+input[type="number"]#donation_amount:focus {
+    outline: none;
+}
+
+/* Amount Display */
+.amount-display {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2563eb;
+    color: #ffffff;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.amount-preset:hover .amount-display {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-5px);
+}
+
+/* Mobile Responsiveness */
+@media screen and (max-width: 640px) {
+    .amount-presets {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .amount-preset {
+        padding: 14px 10px;
+        font-size: 15px;
+    }
+
+    input[type="number"]#donation_amount {
+        font-size: 16px;
+        padding: 10px 10px 10px 35px;
+    }
+
+    .currency-symbol {
+        font-size: 14px;
+        left: 10px;
+    }
+}
+
+/* Input Groups */
+.input-group {
+    margin-bottom: 24px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #1e293b;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+
+.input-hint {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+/* Payment Methods */
+.payment-methods {
+    margin-bottom: 24px;
+}
+
+.payment-method {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.payment-method.active {
+    border-color: #2563eb;
+    background: #f0f7ff;
+}
+
+.payment-method:hover {
+    border-color: #2563eb;
+    background: #f8fafc;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.payment-method label {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0;
+    cursor: pointer;
+    width: 100%;
+}
+
+.method-icon {
+    height: 32px;
+    width: auto;
+}
+
+.method-name {
+    font-weight: 600;
+    color: #1e293b;
+    flex-grow: 1;
+}
+
+/* Payment Details */
+.payment-details {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 16px;
+    display: none;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.payment-details .input-group {
+    margin-bottom: 0;
+}
+
+.payment-details input {
+    background: #ffffff;
+}
+
+/* Radio Button Styling */
+.payment-method input[type="radio"] + label::before {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #e2e8f0;
+    border-radius: 50%;
+    margin-right: 12px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.payment-method.active input[type="radio"] + label::before {
+    border-color: #2563eb;
+    background: #2563eb;
+    box-shadow: inset 0 0 0 4px #ffffff;
+}
+
+/* Navigation Buttons */
+.form-navigation {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 40px;
+}
+
+.primary-button,
+.secondary-button {
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.primary-button {
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
+    flex: 2;
+}
+
+.primary-button:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+.secondary-button {
+    background: #f1f5f9;
+    color: #1e293b;
+    border: none;
+    flex: 1;
+}
+
+.secondary-button:hover {
+    background: #e2e8f0;
+}
+
+.button-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* Messages */
+.donation-message {
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: 500;
+}
+
 .donation-message.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
 }
 
 .donation-message.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
 }
 
-.test-mode-notice {
-    background: #fff3cd;
-    border-left: 4px solid #ffc107;
-    color: #856404;
-    padding: 12px 15px;
-    margin-bottom: 20px;
-    border-radius: 0 4px 4px 0;
-}
-
-@media (max-width: 768px) {
+/* Responsive Design */
+@media screen and (max-width: 640px) {
     .wp-donation-form {
-        padding: 20px;
-        margin: 1em;
+        padding: 24px;
+        margin: 20px;
+        border-radius: 16px;
     }
-    
-    .payment-methods {
+
+    .amount-presets {
+        grid-template-columns: 1fr;
+    }
+
+    .form-navigation {
         flex-direction: column;
     }
+
+    .primary-button,
+    .secondary-button {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Form Steps Animation */
+.form-step {
+    display: none;
+    animation: slideIn 0.4s ease-out;
+    opacity: 0;
+    transform: translateX(20px);
+}
+
+.form-step.active {
+    display: block;
+    opacity: 1;
+    transform: translateX(0);
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Progress Steps Improvements */
+.step-circle::after {
+    content: '✓';
+    position: absolute;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.3s ease;
+}
+
+.step.completed .step-circle::after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Input Focus States */
+input:focus,
+button:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.amount-preset:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Hover Effects */
+.amount-preset:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.payment-method:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Loading States */
+.processing {
+    position: relative;
+    pointer-events: none;
+}
+
+.processing::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: inherit;
+    z-index: 10;
+}
+
+.processing .primary-button {
+    position: relative;
+    padding-right: 48px;
+}
+
+.processing .primary-button::after {
+    content: '';
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ffffff;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* Success Animation */
+@keyframes checkmark {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.success-checkmark {
+    color: #10b981;
+    font-size: 24px;
+    animation: checkmark 0.5s ease-out forwards;
+}
+
+/* Amount Input Improvements */
+.amount-input:focus-within {
+    position: relative;
+}
+
+.amount-input:focus-within::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 14px;
+    background: linear-gradient(to right, #2563eb, #3b82f6);
+    z-index: -1;
+    opacity: 0.1;
+}
+
+.currency {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* Radio Button Styling */
+input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+}
+
+.payment-method input[type="radio"] + label::before {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #e2e8f0;
+    border-radius: 50%;
+    margin-right: 12px;
+    transition: all 0.2s ease;
+}
+
+.payment-method input[type="radio"]:checked + label::before {
+    border-color: #2563eb;
+    background: #2563eb;
+    box-shadow: inset 0 0 0 4px #ffffff;
+}
+
+/* Error States */
+.has-error input {
+    border-color: #ef4444;
+    background: #fef2f2;
+}
+
+.error-message {
+    color: #ef4444;
+    font-size: 13px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.error-message::before {
+    content: '!';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* Accessibility Improvements */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+.screen-reader-text {
+    border: 0;
+    clip: rect(1px, 1px, 1px, 1px);
+    clip-path: inset(50%);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+    word-wrap: normal !important;
+}
+
+/* Mobile Improvements */
+@media (hover: none) {
+    .amount-preset:hover,
+    .payment-method:hover {
+        transform: none;
+        box-shadow: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .progress-steps {
+        padding: 0 10px;
+    }
+
+    .step-circle {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+
+    .step-label {
+        font-size: 12px;
+    }
+
+    .form-section h2 {
+        font-size: 18px;
+    }
+
+    .amount-preset {
+        padding: 14px;
+        font-size: 15px;
+    }
+}
+
+/* Payment Method Image */
+.payment-method img {
+    height: auto;
+    width: 80px; /* Fixed width */
+    object-fit: contain;
+    max-height: 40px;
+    display: block;
+}
+
+/* Payment Method Layout */
+.payment-method label {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0;
+    cursor: pointer;
+    width: 100%;
+    padding: 8px;
+}
+
+/* Payment Method Container */
+.payment-method {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    background: #ffffff;
+}
+
+/* Mobile Adjustments */
+@media screen and (max-width: 640px) {
+    .payment-method img {
+        width: 60px; /* Smaller width on mobile */
+        max-height: 32px;
+    }
+
+    .payment-method label {
+        gap: 12px;
+        padding: 6px;
+    }
+
+    .payment-method {
+        padding: 10px 12px;
+    }
+}
+
+/* High DPI Screens */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .payment-method img {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
 }

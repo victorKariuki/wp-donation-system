@@ -62,53 +62,71 @@ class WP_Donation_System_Callbacks {
     }
 
     public function handle_mpesa_callback($request) {
-        $logger = new WP_Donation_System_Logger();
-        $logger->log('M-Pesa callback received: ' . json_encode($request->get_params()), 'info');
+        $this->logger->log('M-Pesa callback received', 'debug', [
+            'request' => $request->get_params()
+        ]);
 
-        $params = $request->get_params();
+        $body = $request->get_json_params();
         
-        // Verify M-Pesa callback
-        if (!$this->verify_mpesa_callback($params)) {
-            $logger->log('M-Pesa callback verification failed', 'error');
-            return new WP_Error('verification_failed', 'Callback verification failed', array('status' => 400));
+        if (empty($body)) {
+            $this->logger->log('Empty callback body received', 'error');
+            return new WP_Error('invalid_callback', 'Invalid callback data', ['status' => 400]);
         }
 
-        // Process the callback
-        if ($params['ResultCode'] === '0') { // Success
-            global $wpdb;
-            
-            // Update donation status
-            $wpdb->update(
-                $wpdb->prefix . 'donations',
-                array(
-                    'status' => 'completed',
-                    'transaction_id' => $params['TransactionID']
-                ),
-                array('checkout_request_id' => $params['CheckoutRequestID'])
-            );
+        try {
+            // Extract relevant data
+            $result_code = $body['Body']['stkCallback']['ResultCode'] ?? null;
+            $result_desc = $body['Body']['stkCallback']['ResultDesc'] ?? '';
+            $merchant_request_id = $body['Body']['stkCallback']['MerchantRequestID'] ?? '';
+            $checkout_request_id = $body['Body']['stkCallback']['CheckoutRequestID'] ?? '';
 
-            // Get donation details
+            $this->logger->log('Processing M-Pesa callback', 'info', [
+                'result_code' => $result_code,
+                'result_desc' => $result_desc,
+                'merchant_request_id' => $merchant_request_id,
+                'checkout_request_id' => $checkout_request_id
+            ]);
+
+            // Find the donation by checkout request ID
+            global $wpdb;
             $donation = $wpdb->get_row($wpdb->prepare(
                 "SELECT * FROM {$wpdb->prefix}donations WHERE checkout_request_id = %s",
-                $params['CheckoutRequestID']
+                $checkout_request_id
             ));
 
-            if ($donation) {
-                // Send notifications
-                $notifications = new WP_Donation_System_Notifications();
-                $notifications->send_donor_notification($donation);
-                $notifications->send_admin_notification($donation);
+            if (!$donation) {
+                throw new Exception('Donation not found for checkout request ID: ' . $checkout_request_id);
             }
-        } else {
-            // Update donation status as failed
-            $wpdb->update(
-                $wpdb->prefix . 'donations',
-                array('status' => 'failed'),
-                array('checkout_request_id' => $params['CheckoutRequestID'])
+
+            if ($result_code === '0') {
+                // Payment successful
+                $this->database->update_donation($donation->id, [
+                    'status' => 'completed',
+                    'transaction_id' => $body['Body']['stkCallback']['CallbackMetadata']['Item'][1]['Value'] ?? '',
+                    'notes' => $result_desc
+                ]);
+            } else {
+                // Payment failed
+                $this->database->update_donation($donation->id, [
+                    'status' => 'failed',
+                    'notes' => $result_desc
+                ]);
+            }
+
+            return new WP_REST_Response(['ResultCode' => 0, 'ResultDesc' => 'Success'], 200);
+
+        } catch (Exception $e) {
+            $this->logger->log('Callback processing failed', 'error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return new WP_Error(
+                'callback_processing_failed',
+                $e->getMessage(),
+                ['status' => 500]
             );
         }
-
-        return new WP_REST_Response(array('status' => 'success'), 200);
     }
 
     private function verify_paypal_ipn($params) {

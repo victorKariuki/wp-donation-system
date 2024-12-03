@@ -97,7 +97,6 @@ class WP_Donation_System_MPesa {
             ? 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
             : 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
 
-        $currency = new WP_Donation_System_Currency();
         $amount = floatval($form_data['amount']);
         $phone = sanitize_text_field($form_data['phone_number']);
         
