@@ -66,25 +66,6 @@ function wp_donation_system_activate() {
             throw new Exception('Failed to create database tables: ' . $e->getMessage());
         }
         
-        // Create required directories with proper permissions
-        $upload_dir = wp_upload_dir();
-        $plugin_dir = $upload_dir['basedir'] . '/wp-donation-system';
-        $logs_dir = $plugin_dir . '/logs';
-
-        if (!wp_mkdir_p($logs_dir)) {
-            throw new Exception('Failed to create required directories.');
-        }
-
-        // Set proper directory permissions
-        chmod($plugin_dir, 0755);
-        chmod($logs_dir, 0755);
-
-        // Create .htaccess to protect logs
-        $htaccess_content = "Order deny,allow\nDeny from all";
-        if (!file_put_contents($logs_dir . '/.htaccess', $htaccess_content)) {
-            throw new Exception('Failed to create .htaccess file.');
-        }
-
         // Set initial options
         add_option('wp_donation_system_version', WP_DONATION_SYSTEM_VERSION);
         add_option('wp_donation_system_db_version', '1.0.0');

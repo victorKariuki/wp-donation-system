@@ -9,11 +9,14 @@ class WP_Donation_System_MPesa {
     private $passkey;
     private $callback_url;
     private $business_number;
+    private $transactions;
 
     public function __construct() {
         $this->settings = get_option('wp_donation_system_settings', array());
         require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
+        require_once WP_DONATION_SYSTEM_PATH . 'includes/class-mpesa-transaction.php';
         $this->logger = new WP_Donation_System_Logger();
+        $this->transactions = new WP_Donation_System_MPesa_Transaction();
         
         // Initialize settings
         $this->environment = $this->get_setting('mpesa_env', 'sandbox');
@@ -33,7 +36,7 @@ class WP_Donation_System_MPesa {
         }
         
         // Set callback URL - ensure it's a full, valid URL
-        $callback_base = site_url('/wp-json/wp-donation-system/v1/pesa-callback');
+        $callback_base = site_url('/wp-json/wp-donation-system/v1/payment/callback');
         $this->callback_url = esc_url_raw($callback_base);
 
         // Log initialization with callback URL validation
@@ -191,6 +194,17 @@ class WP_Donation_System_MPesa {
                 'response_description' => $body->ResponseDescription ?? '',
                 'completion_time' => current_time('mysql')
             ]);
+
+            // Save transaction record
+            $transaction_id = $this->transactions->save_stk_request(
+                $payment_data['donation_id'],
+                $stk_request_data,
+                $body
+            );
+            
+            if (!$transaction_id) {
+                throw new Exception('Failed to save transaction record');
+            }
 
             return (object) array(
                 'success' => true,

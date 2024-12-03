@@ -2,33 +2,49 @@
 class WP_Donation_System_Callbacks {
     private $logger;
     private $database;
+    private $transactions;
 
     public function __construct() {
         require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
         require_once WP_DONATION_SYSTEM_PATH . 'includes/class-database.php';
+        require_once WP_DONATION_SYSTEM_PATH . 'includes/class-mpesa-transaction.php';
         $this->logger = new WP_Donation_System_Logger();
         $this->database = new WP_Donation_System_Database();
+        $this->transactions = new WP_Donation_System_MPesa_Transaction();
         
         add_action('rest_api_init', array($this, 'register_endpoints'));
     }
 
     public function register_endpoints() {
-        // M-Pesa callback endpoint
-        register_rest_route('wp-donation-system/v1', '/pesa-callback', array(
+        // Register payment callback endpoints
+        register_rest_route('wp-donation-system/v1', '/payment/callback', array(
             'methods' => 'POST',
-            'callback' => array($this, 'handle_mpesa_callback'),
+            'callback' => array($this, 'handle_payment_callback'),
+            'permission_callback' => '__return_true'
+        ));
+
+        // Register payment timeout endpoints
+        register_rest_route('wp-donation-system/v1', '/payment/timeout', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'handle_payment_timeout'),
+            'permission_callback' => '__return_true'
+        ));
+
+        register_rest_route('wp-donation-system/v1', '/payment/result', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'handle_payment_result'),
             'permission_callback' => '__return_true'
         ));
     }
 
-    public function handle_mpesa_callback($request) {
+    public function handle_payment_callback($request) {
         $log_context = [
             'request_time' => current_time('mysql'),
             'request_id' => uniqid('callback_', true),
             'remote_ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
         ];
 
-        $this->logger->log('M-Pesa callback received', 'debug', [
+        $this->logger->log('Payment callback received', 'debug', [
             ...$log_context,
             'raw_data' => $request->get_body(),
             'headers' => $request->get_headers(),
@@ -37,35 +53,25 @@ class WP_Donation_System_Callbacks {
 
         $body = $request->get_json_params();
         
-        if (empty($body)) {
-            $log_context['error_type'] = 'empty_callback';
-            $this->logger->log('Empty callback data received', 'error', [
+        if (empty($body) || empty($body['Body']['stkCallback'])) {
+            $log_context['error_type'] = 'invalid_callback';
+            $this->logger->log('Invalid callback data received', 'error', [
                 ...$log_context,
                 'raw_body' => $request->get_body()
             ]);
             return new WP_REST_Response(['ResultCode' => 0], 200);
         }
 
-        // Extract callback data
-        $callback_data = $body['Body']['stkCallback'] ?? null;
-        if (!$callback_data) {
-            $log_context['error_type'] = 'invalid_structure';
-            $this->logger->log('Invalid callback structure', 'error', [
-                ...$log_context,
-                'received_body' => $body
-            ]);
-            return new WP_REST_Response(['ResultCode' => 0], 200);
-        }
-
-        $result_code = $callback_data['ResultCode'] ?? null;
-        $result_desc = $callback_data['ResultDesc'] ?? '';
-        $merchant_request_id = $callback_data['MerchantRequestID'] ?? '';
-        $checkout_request_id = $callback_data['CheckoutRequestID'] ?? '';
+        $callback_data = $body['Body']['stkCallback'];
+        $result_code = $callback_data['ResultCode'];
+        $result_desc = $callback_data['ResultDesc'];
+        $merchant_request_id = $callback_data['MerchantRequestID'];
+        $checkout_request_id = $callback_data['CheckoutRequestID'];
 
         $log_context['result_code'] = $result_code;
         $log_context['merchant_request_id'] = $merchant_request_id;
         $log_context['checkout_request_id'] = $checkout_request_id;
-        $this->logger->log('Processing M-Pesa callback', 'info', [
+        $this->logger->log('Processing payment callback', 'info', [
             ...$log_context,
             'result_desc' => $result_desc
         ]);
@@ -87,15 +93,13 @@ class WP_Donation_System_Callbacks {
 
         $log_context['donation_id'] = $donation->id;
 
-        if ($result_code === '0') {
-            // Extract payment details
-            $callback_metadata = $callback_data['CallbackMetadata']['Item'] ?? [];
+        if ($result_code === 0) {
+            // Extract payment details from callback metadata items
+            $metadata_items = $callback_data['CallbackMetadata']['Item'];
             $payment_details = [];
             
-            foreach ($callback_metadata as $item) {
-                $name = $item['Name'] ?? '';
-                $value = $item['Value'] ?? '';
-                $payment_details[$name] = $value;
+            foreach ($metadata_items as $item) {
+                $payment_details[$item['Name']] = $item['Value'];
             }
 
             $log_context['payment_details'] = $payment_details;
@@ -103,12 +107,12 @@ class WP_Donation_System_Callbacks {
             // Update donation as completed
             $update_data = [
                 'status' => 'completed',
-                'transaction_id' => $payment_details['MpesaReceiptNumber'] ?? '',
+                'transaction_id' => $payment_details['MpesaReceiptNumber'],
                 'notes' => $result_desc,
                 'metadata' => wp_json_encode([
-                    'amount' => $payment_details['Amount'] ?? '',
-                    'phone' => $payment_details['PhoneNumber'] ?? '',
-                    'transaction_date' => $payment_details['TransactionDate'] ?? '',
+                    'amount' => $payment_details['Amount'],
+                    'phone' => $payment_details['PhoneNumber'],
+                    'transaction_date' => $payment_details['TransactionDate'],
                     'merchant_request_id' => $merchant_request_id
                 ])
             ];
@@ -150,7 +154,12 @@ class WP_Donation_System_Callbacks {
             ]);
         }
 
-        // Send response to M-Pesa
+        // Update transaction record
+        $this->transactions->update_from_callback(
+            $checkout_request_id,
+            $callback_data
+        );
+
         return new WP_REST_Response([
             'ResultCode' => 0,
             'ResultDesc' => 'Callback processed successfully'

@@ -131,20 +131,16 @@
                         <?php
                         // Define default callback URLs
                         $default_urls = array(
-                            'mpesa_callback_url' => home_url('wp-json/wp-donation-system/v1/mpesa/callback'),
-                            'mpesa_timeout_url' => home_url('wp-json/wp-donation-system/v1/mpesa/timeout'),
-                            'mpesa_result_url' => home_url('wp-json/wp-donation-system/v1/mpesa/result'),
-                            'mpesa_confirmation_url' => home_url('wp-json/wp-donation-system/v1/mpesa/confirmation'),
-                            'mpesa_validation_url' => home_url('wp-json/wp-donation-system/v1/mpesa/validation')
+                            'mpesa_callback_url' => rest_url('wp-donation-system/v1/payment/callback'),
+                            'mpesa_timeout_url' => rest_url('wp-donation-system/v1/payment/timeout'),
+                            'mpesa_result_url' => rest_url('wp-donation-system/v1/payment/result')
                         );
 
                         // URL field labels
                         $url_labels = array(
                             'mpesa_callback_url' => __('Callback URL:', 'wp-donation-system'),
                             'mpesa_timeout_url' => __('Timeout URL:', 'wp-donation-system'),
-                            'mpesa_result_url' => __('Result URL:', 'wp-donation-system'),
-                            'mpesa_confirmation_url' => __('Confirmation URL:', 'wp-donation-system'),
-                            'mpesa_validation_url' => __('Validation URL:', 'wp-donation-system')
+                            'mpesa_result_url' => __('Result URL:', 'wp-donation-system')
                         );
 
                         foreach ($default_urls as $key => $default_url):
