@@ -60,10 +60,13 @@ class WP_Donation_System_Form {
             WP_DONATION_SYSTEM_VERSION
         );
 
-        // Enqueue jQuery and our script
+        // Enqueue jQuery
+        wp_enqueue_script('jquery');
+
+        // Enqueue our script
         wp_enqueue_script(
             'wp-donation-system',
-            WP_DONATION_SYSTEM_URL . 'assets/js/donation-form.js',
+            WP_DONATION_SYSTEM_URL . 'assets/js/public-script.js',
             array('jquery'),
             WP_DONATION_SYSTEM_VERSION,
             true
@@ -74,9 +77,17 @@ class WP_Donation_System_Form {
     }
 
     public function localize_script() {
+        $currency = new WP_Donation_System_Currency();
+        $default_currency = $this->get_setting_value('default_currency', 'USD');
+        $currency_data = $currency->get_currency($default_currency);
+
         wp_localize_script('wp-donation-system', 'wpDonationSystem', array(
-            'ajaxurl' => admin_url('admin-ajax.php'),
+            'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('wp_donation_system'),
+            'currency' => array(
+                'code' => $default_currency,
+                'data' => $currency_data
+            ),
             'i18n' => array(
                 'invalid_amount' => __('Please enter a valid donation amount.', 'wp-donation-system'),
                 'amount_range' => __('Please enter an amount between {min} and {max}.', 'wp-donation-system'),
@@ -90,7 +101,14 @@ class WP_Donation_System_Form {
                 'waiting_payment' => __('Waiting for payment...', 'wp-donation-system'),
                 'payment_timeout' => __('Payment timeout. Please try again.', 'wp-donation-system'),
                 'retry_payment' => __('Retry Payment', 'wp-donation-system'),
-            )
+            ),
+            'mpesa_waiting_title' => __('Waiting for M-Pesa Payment', 'wp-donation-system'),
+            'mpesa_waiting_message' => __('Please check your phone and enter your M-Pesa PIN to complete the payment.', 'wp-donation-system'),
+            'mpesa_timeout' => __('M-Pesa payment request timed out. Please try again.', 'wp-donation-system'),
+            'seconds_remaining' => __('seconds remaining', 'wp-donation-system'),
+            'cancel_payment' => __('Cancel Payment', 'wp-donation-system'),
+            'retry_payment' => __('Try Again', 'wp-donation-system'),
+            'complete_required_fields' => __('Please complete all required fields.', 'wp-donation-system'),
         ));
     }
 }

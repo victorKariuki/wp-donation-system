@@ -93,9 +93,20 @@ require_once WP_DONATION_SYSTEM_PATH . 'includes/class-error-handler.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-currency.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-rate-limiter.php';
 
+// Load gateway system
+require_once WP_DONATION_SYSTEM_PATH . 'includes/gateways/class-abstract-gateway.php';
+require_once WP_DONATION_SYSTEM_PATH . 'includes/class-gateway-manager.php';
+
+// Load settings system
+require_once WP_DONATION_SYSTEM_PATH . 'includes/class-settings-manager.php';
+
 // Load feature classes
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-donation-form.php';
+
+// Load payment gateways
 require_once WP_DONATION_SYSTEM_PATH . 'includes/gateways/class-mpesa.php';
+require_once WP_DONATION_SYSTEM_PATH . 'includes/gateways/class-paypal.php';
+
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-notifications.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-callbacks.php';
 require_once WP_DONATION_SYSTEM_PATH . 'includes/class-updater.php';
@@ -108,17 +119,17 @@ require_once WP_DONATION_SYSTEM_PATH . 'admin/class-donations-list-table.php';
 // Initialize plugin
 function wp_donation_system_init() {
     new WP_Donation_System_Form();
-    new WP_Donation_System_MPesa();
     new WP_Donation_System_Notifications();
     new WP_Donation_System_Admin();
     new WP_Donation_System_Callbacks();
     new WP_Donation_System_Updater();
 
+    // Initialize gateway manager
+    WP_Donation_System_Gateway_Manager::get_instance();
+
     // Add AJAX actions
     add_action('wp_ajax_process_donation', array(new WP_Donation_System_Ajax(), 'process_donation'));
     add_action('wp_ajax_nopriv_process_donation', array(new WP_Donation_System_Ajax(), 'process_donation'));
-    add_action('wp_ajax_check_donation_status', array(new WP_Donation_System_Ajax(), 'check_donation_status'));
-    add_action('wp_ajax_nopriv_check_donation_status', array(new WP_Donation_System_Ajax(), 'check_donation_status'));
 }
 add_action('plugins_loaded', 'wp_donation_system_init');
 
@@ -135,4 +146,10 @@ add_action('rest_api_init', function() {
         'callback' => array('WP_Donation_System_Callbacks', 'handle_mpesa_callback'),
         'permission_callback' => '__return_true'
     ));
+});
+
+// Initialize plugin after WordPress is fully loaded
+add_action('init', function() {
+    // Initialize gateway manager
+    WP_Donation_System_Gateway_Manager::get_instance();
 });

@@ -64,6 +64,10 @@ class WP_Donation_System_Admin {
         // Initialize settings
         $this->settings = get_option('wp_donation_system_settings', $this->default_settings);
 
+        // Initialize managers
+        WP_Donation_System_Settings_Manager::get_instance();
+        WP_Donation_System_Gateway_Manager::get_instance();
+
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
         add_action('admin_init', array($this, 'initialize_settings'));
@@ -77,6 +81,14 @@ class WP_Donation_System_Admin {
 
         // Add script enqueuing
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+
+        // Add AJAX handlers
+        add_action('wp_ajax_save_gateway_settings', array($this, 'handle_save_gateway_settings'));
+        add_action('wp_ajax_reset_gateway_settings', array($this, 'handle_reset_gateway_settings'));
+        add_action('wp_ajax_test_gateway_connection', array($this, 'handle_test_gateway_connection'));
+        add_action('wp_ajax_save_settings', array($this, 'handle_save_settings'));
+        add_action('wp_ajax_reset_settings', array($this, 'handle_reset_settings'));
+        add_action('wp_ajax_toggle_gateway', array($this, 'handle_toggle_gateway'));
     }
 
     /**
@@ -119,102 +131,54 @@ class WP_Donation_System_Admin {
      * Save plugin settings
      */
     private function save_settings() {
-        if (!current_user_can('manage_options') || !check_admin_referer('wp_donation_system_settings', 'donation_nonce')) {
+        if (!current_user_can('manage_options')) {
             return;
         }
 
-        $active_tab = isset($_POST['active_tab']) ? sanitize_key($_POST['active_tab']) : 'general';
-        
-        // Get current settings
-        $new_settings = $this->settings;
+        // Get gateway manager instance
+        $gateway_manager = WP_Donation_System_Gateway_Manager::get_instance();
+        $gateways = $gateway_manager->get_all_gateways();
 
-        switch ($active_tab) {
-            case 'general':
-                $new_settings['test_mode'] = isset($_POST['test_mode']);
-                $new_settings['default_currency'] = sanitize_text_field($_POST['default_currency']);
-                $new_settings['donation_minimum'] = floatval($_POST['donation_minimum']);
-                $new_settings['donation_maximum'] = floatval($_POST['donation_maximum']);
-                break;
-
-            case 'payment':
-                // M-Pesa Settings
-                $new_settings['mpesa_enabled'] = isset($_POST['mpesa_enabled']);
-                if ($new_settings['mpesa_enabled']) {
-                    $mpesa_fields = array(
-                        'env', 'type', 'shortcode', 'consumer_key', 'consumer_secret',
-                        'passkey', 'account_ref', 'transaction_desc'
-                    );
-                    foreach ($mpesa_fields as $field) {
-                        $key = 'mpesa_' . $field;
-                        if (isset($_POST[$key])) {
-                            $new_settings[$key] = sanitize_text_field($_POST[$key]);
-                        }
-                    }
+        // Save gateway settings
+        foreach ($gateways as $gateway) {
+            $gateway_id = $gateway->get_id();
+            $gateway_settings = [];
+            
+            // Get gateway fields
+            $fields = $gateway->get_settings_fields();
+            
+            // Handle enabled status
+            $gateway_settings['enabled'] = isset($_POST[$gateway_id . '_enabled']);
+            
+            // Process each field
+            foreach ($fields as $field_id => $field) {
+                if ($field_id === 'enabled') continue; // Already handled
+                
+                $post_key = $gateway_id . '_' . $field_id;
+                if (isset($_POST[$post_key])) {
+                    $gateway_settings[$field_id] = sanitize_text_field($_POST[$post_key]);
                 }
-                break;
-
-            case 'email':
-                $email_fields = array(
-                    'email_notifications' => 'bool',
-                    'admin_email' => 'email',
-                    'email_from_name' => 'text',
-                    'email_from_address' => 'email',
-                    'admin_email_subject' => 'text',
-                    'admin_email_template' => 'html',
-                    'donor_email_subject' => 'text',
-                    'donor_email_template' => 'html',
-                    'receipt_footer' => 'html'
-                );
-
-                foreach ($email_fields as $field => $type) {
-                    if ($type === 'bool') {
-                        $new_settings[$field] = isset($_POST[$field]);
-                    } else if ($type === 'email') {
-                        $new_settings[$field] = sanitize_email($_POST[$field]);
-                    } else if ($type === 'html') {
-                        $new_settings[$field] = wp_kses_post($_POST[$field]);
-                    } else {
-                        $new_settings[$field] = sanitize_text_field($_POST[$field]);
-                    }
-                }
-                break;
-
-            case 'advanced':
-                $new_settings['success_page'] = absint($_POST['success_page']);
-                $new_settings['cancel_page'] = absint($_POST['cancel_page']);
-                $new_settings['delete_data'] = isset($_POST['delete_data']);
-                $new_settings['debug_mode'] = isset($_POST['debug_mode']);
-                $new_settings['rate_limiting'] = isset($_POST['rate_limiting']);
-                $new_settings['custom_css'] = sanitize_textarea_field($_POST['custom_css']);
-                break;
+            }
+            
+            // Save gateway settings
+            update_option('wp_donation_system_' . $gateway_id . '_settings', $gateway_settings);
         }
 
-        // Update settings
-        $this->settings = $new_settings;
-        update_option('wp_donation_system_settings', $new_settings);
-
-        // Clear caches
-        wp_cache_delete('wp_donation_system_settings', 'options');
-        delete_transient('wp_donation_system_cache');
-
-        // Add success message
-        add_settings_error(
-            'wp_donation_system_messages',
-            'settings_updated',
-            __('Settings saved successfully.', 'wp-donation-system'),
-            'updated'
-        );
-
-        // Redirect to same tab
-        wp_safe_redirect(add_query_arg(
-            array(
-                'page' => 'wp-donation-system-settings',
-                'tab' => $active_tab,
-                'settings-updated' => 'true'
-            ),
-            admin_url('admin.php')
-        ));
-        exit;
+        // Save general settings
+        $general_settings = [
+            'test_mode' => isset($_POST['test_mode']),
+            'default_currency' => sanitize_text_field($_POST['default_currency']),
+            'email_notifications' => isset($_POST['email_notifications']),
+            'admin_email' => sanitize_email($_POST['admin_email']),
+            'donation_minimum' => floatval($_POST['donation_minimum']),
+            'donation_maximum' => floatval($_POST['donation_maximum']),
+            'success_page' => intval($_POST['success_page']),
+            'cancel_page' => intval($_POST['cancel_page']),
+            'email_template' => sanitize_text_field($_POST['email_template']),
+            'receipt_footer' => wp_kses_post($_POST['receipt_footer'])
+        ];
+        
+        update_option('wp_donation_system_settings', $general_settings);
     }
 
     /**
@@ -304,6 +268,7 @@ class WP_Donation_System_Admin {
      * Enqueue admin assets
      */
     public function enqueue_admin_assets($hook) {
+        // Only load on our plugin's pages
         if (strpos($hook, 'wp-donation-system') === false) {
             return;
         }
@@ -316,25 +281,61 @@ class WP_Donation_System_Admin {
             WP_DONATION_SYSTEM_VERSION
         );
 
-        // Enqueue admin script
+        // Add payment gateways specific styles
+        if (strpos($hook, 'wp-donation-system-settings') !== false) {
+            wp_enqueue_style(
+                'wp-donation-system-payment-gateways',
+                WP_DONATION_SYSTEM_URL . 'admin/css/payment-gateways.css',
+                array('wp-donation-system-admin'),
+                WP_DONATION_SYSTEM_VERSION
+            );
+        }
+
+        // Enqueue admin scripts
         wp_enqueue_script(
             'wp-donation-system-admin',
-            WP_DONATION_SYSTEM_URL . 'admin/js/admin-script.js',
-            array('jquery'),
+            WP_DONATION_SYSTEM_URL . 'admin/js/admin.js',
+            array('jquery', 'wp-util'),
             WP_DONATION_SYSTEM_VERSION,
             true
         );
 
-        // Localize script with separate nonces
+        // Add payment gateways specific scripts
+        if (strpos($hook, 'wp-donation-system-settings') !== false) {
+            wp_enqueue_script(
+                'wp-donation-system-payment-gateways',
+                WP_DONATION_SYSTEM_URL . 'admin/js/payment-gateways.js',
+                array('jquery', 'wp-donation-system-admin'),
+                WP_DONATION_SYSTEM_VERSION,
+                true
+            );
+
+            // Add settings scripts
+            wp_enqueue_script(
+                'wp-donation-system-settings',
+                WP_DONATION_SYSTEM_URL . 'admin/js/settings.js',
+                array('jquery', 'wp-donation-system-admin'),
+                WP_DONATION_SYSTEM_VERSION,
+                true
+            );
+        }
+
+        // Localize script
         wp_localize_script('wp-donation-system-admin', 'wpDonationSystem', array(
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('wp_donation_system_settings'),
-            'logs_nonce' => wp_create_nonce('wp_donation_system_logs'),
-            'i18n' => array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('wp_donation_system_admin'),
+            'strings' => array(
+                'confirm_delete' => __('Are you sure you want to delete this donation?', 'wp-donation-system'),
                 'saving' => __('Saving...', 'wp-donation-system'),
                 'saved' => __('Settings saved successfully.', 'wp-donation-system'),
-                'error' => __('An error occurred while saving settings.', 'wp-donation-system'),
-                'confirmClearLogs' => __('Are you sure you want to clear all logs?', 'wp-donation-system')
+                'error' => __('An error occurred.', 'wp-donation-system'),
+                'test_success' => __('Test transaction successful!', 'wp-donation-system'),
+                'test_failed' => __('Test transaction failed.', 'wp-donation-system'),
+                'checking_status' => __('Checking payment status...', 'wp-donation-system'),
+                'network_error' => __('Network error occurred', 'wp-donation-system'),
+                'confirm_reset' => __('Are you sure you want to reset settings to defaults?', 'wp-donation-system'),
+                'enabled' => __('Enabled', 'wp-donation-system'),
+                'disabled' => __('Disabled', 'wp-donation-system')
             )
         ));
     }
@@ -458,48 +459,26 @@ class WP_Donation_System_Admin {
      */
     private function save_payment_settings(&$settings) {
         // M-Pesa Settings
-        $settings['mpesa_enabled'] = isset($_POST['mpesa_enabled']);
-        if ($settings['mpesa_enabled']) {
+        $mpesa_settings = get_option('wp_donation_system_mpesa_settings', []);
+        $mpesa_settings['enabled'] = isset($_POST['mpesa_enabled']);
+        
+        if ($mpesa_settings['enabled']) {
             $mpesa_fields = array(
-                'env', 'type', 'shortcode', 'consumer_key', 'consumer_secret',
-                'passkey', 'account_ref', 'transaction_desc', 'number'
+                'environment' => 'env',
+                'shortcode' => 'shortcode',
+                'consumer_key' => 'consumer_key',
+                'consumer_secret' => 'consumer_secret',
+                'passkey' => 'passkey'
             );
-            foreach ($mpesa_fields as $field) {
-                $key = 'mpesa_' . $field;
-                if (isset($_POST[$key])) {
-                    $settings[$key] = sanitize_text_field($_POST[$key]);
+            
+            foreach ($mpesa_fields as $setting_key => $post_key) {
+                if (isset($_POST['mpesa_' . $post_key])) {
+                    $mpesa_settings[$setting_key] = sanitize_text_field($_POST['mpesa_' . $post_key]);
                 }
-            }
-
-            // Validate required M-Pesa fields
-            $required_fields = array('consumer_key', 'consumer_secret', 'shortcode', 'passkey');
-            foreach ($required_fields as $field) {
-                $key = 'mpesa_' . $field;
-                if (empty($settings[$key])) {
-                    throw new Exception(sprintf(__('%s is required for M-Pesa integration.', 'wp-donation-system'), $field));
-                }
-            }
-
-            // Test credentials if in sandbox mode
-            if ($settings['mpesa_env'] === 'sandbox') {
-                require_once WP_DONATION_SYSTEM_PATH . 'includes/gateways/class-mpesa.php';
-                $mpesa = new WP_Donation_System_MPesa();
-                $test_token = $mpesa->get_access_token();
-                
-                if (!$test_token) {
-                    throw new Exception(__('Invalid M-Pesa credentials. Please verify your Consumer Key and Secret.', 'wp-donation-system'));
-                }
-            }
-        } else {
-            // Clear M-Pesa settings when disabled
-            $mpesa_fields = array(
-                'env', 'type', 'shortcode', 'consumer_key', 'consumer_secret',
-                'passkey', 'account_ref', 'transaction_desc', 'number'
-            );
-            foreach ($mpesa_fields as $field) {
-                $settings['mpesa_' . $field] = '';
             }
         }
+        
+        update_option('wp_donation_system_mpesa_settings', $mpesa_settings);
     }
 
     /**
@@ -759,5 +738,202 @@ class WP_Donation_System_Admin {
 
         // Add dashicons for the test interface
         wp_enqueue_style('dashicons');
+    }
+
+    public function handle_save_gateway_settings() {
+        check_ajax_referer('wp_donation_system_admin', 'security');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Permission denied.', 'wp-donation-system')));
+        }
+        
+        $gateway_id = sanitize_text_field($_POST['gateway'] ?? '');
+        if (empty($gateway_id)) {
+            wp_send_json_error(array('message' => __('Invalid gateway.', 'wp-donation-system')));
+        }
+        
+        $gateway_manager = WP_Donation_System_Gateway_Manager::get_instance();
+        $gateway = $gateway_manager->get_gateway($gateway_id);
+        
+        if (!$gateway) {
+            wp_send_json_error(array('message' => __('Gateway not found.', 'wp-donation-system')));
+        }
+        
+        // Get current settings
+        $settings = get_option('wp_donation_system_' . $gateway_id . '_settings', []);
+        
+        // Update enabled status
+        $settings['enabled'] = isset($_POST[$gateway_id . '_enabled']);
+        
+        // Update other fields
+        $fields = $gateway->get_settings_fields();
+        foreach ($fields as $field_id => $field) {
+            if ($field_id === 'enabled') continue;
+            
+            $field_name = $gateway_id . '_' . $field_id;
+            if (isset($_POST[$field_name])) {
+                // Sanitize based on field type
+                switch ($field['type']) {
+                    case 'number':
+                        $settings[$field_id] = floatval($_POST[$field_name]);
+                        break;
+                    case 'checkbox':
+                        $settings[$field_id] = !empty($_POST[$field_name]);
+                        break;
+                    case 'select':
+                        $settings[$field_id] = sanitize_text_field($_POST[$field_name]);
+                        break;
+                    case 'password':
+                        if (!empty($_POST[$field_name])) {
+                            $settings[$field_id] = sanitize_text_field($_POST[$field_name]);
+                        }
+                        break;
+                    default:
+                        $settings[$field_id] = sanitize_text_field($_POST[$field_name]);
+                }
+            }
+        }
+        
+        // Save settings
+        update_option('wp_donation_system_' . $gateway_id . '_settings', $settings);
+        
+        wp_send_json_success(array(
+            'message' => __('Settings saved successfully.', 'wp-donation-system')
+        ));
+    }
+
+    public function handle_reset_gateway_settings() {
+        check_ajax_referer('wp_donation_system_admin', 'security');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Permission denied.', 'wp-donation-system')));
+        }
+        
+        $gateway_id = sanitize_text_field($_POST['gateway'] ?? '');
+        if (empty($gateway_id)) {
+            wp_send_json_error(array('message' => __('Invalid gateway.', 'wp-donation-system')));
+        }
+        
+        delete_option('wp_donation_system_' . $gateway_id . '_settings');
+        
+        wp_send_json_success();
+    }
+
+    public function handle_test_gateway_connection() {
+        check_ajax_referer('wp_donation_system_admin', 'security');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Permission denied.', 'wp-donation-system')));
+        }
+        
+        $gateway_id = sanitize_text_field($_POST['gateway'] ?? '');
+        if (empty($gateway_id)) {
+            wp_send_json_error(array('message' => __('Invalid gateway.', 'wp-donation-system')));
+        }
+        
+        $gateway_manager = WP_Donation_System_Gateway_Manager::get_instance();
+        $gateway = $gateway_manager->get_gateway($gateway_id);
+        
+        if (!$gateway) {
+            wp_send_json_error(array('message' => __('Gateway not found.', 'wp-donation-system')));
+        }
+        
+        $result = $gateway->test_connection();
+        
+        if (is_wp_error($result)) {
+            wp_send_json_error(array('message' => $result->get_error_message()));
+        }
+        
+        wp_send_json_success(array('message' => __('Connection test successful!', 'wp-donation-system')));
+    }
+
+    public function handle_save_settings() {
+        check_ajax_referer('wp_donation_system_admin', 'security');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Permission denied.', 'wp-donation-system')));
+        }
+        
+        $group_id = sanitize_text_field($_POST['settings_group'] ?? '');
+        if (empty($group_id)) {
+            wp_send_json_error(array('message' => __('Invalid settings group.', 'wp-donation-system')));
+        }
+        
+        $settings_manager = WP_Donation_System_Settings_Manager::get_instance();
+        $group = $settings_manager->get_settings_group($group_id);
+        
+        if (!$group) {
+            wp_send_json_error(array('message' => __('Settings group not found.', 'wp-donation-system')));
+        }
+        
+        $settings = array();
+        foreach ($group['fields'] as $field_id => $field) {
+            $field_name = $group_id . '_' . $field_id;
+            
+            switch ($field['type']) {
+                case 'checkbox':
+                    $settings[$field_id] = isset($_POST[$field_name]);
+                    break;
+                case 'number':
+                    $settings[$field_id] = floatval($_POST[$field_name] ?? $field['default'] ?? 0);
+                    break;
+                case 'textarea':
+                    $settings[$field_id] = wp_kses_post($_POST[$field_name] ?? '');
+                    break;
+                default:
+                    $settings[$field_id] = sanitize_text_field($_POST[$field_name] ?? '');
+            }
+        }
+        
+        $settings_manager->save_settings($group_id, $settings);
+        
+        wp_send_json_success(array(
+            'message' => __('Settings saved successfully.', 'wp-donation-system')
+        ));
+    }
+
+    public function handle_reset_settings() {
+        check_ajax_referer('wp_donation_system_admin', 'security');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Permission denied.', 'wp-donation-system')));
+        }
+        
+        $group_id = sanitize_text_field($_POST['group'] ?? '');
+        if (empty($group_id)) {
+            wp_send_json_error(array('message' => __('Invalid settings group.', 'wp-donation-system')));
+        }
+        
+        delete_option('wp_donation_system_' . $group_id . '_settings');
+        
+        wp_send_json_success();
+    }
+
+    public function handle_toggle_gateway() {
+        check_ajax_referer('wp_donation_system_admin', 'security');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Permission denied.', 'wp-donation-system')));
+        }
+        
+        $gateway_id = sanitize_text_field($_POST['gateway'] ?? '');
+        if (empty($gateway_id)) {
+            wp_send_json_error(array('message' => __('Invalid gateway.', 'wp-donation-system')));
+        }
+        
+        $enabled = !empty($_POST['enabled']);
+        
+        // Get current settings
+        $settings = get_option('wp_donation_system_' . $gateway_id . '_settings', []);
+        
+        // Update enabled status
+        $settings['enabled'] = $enabled;
+        
+        // Save settings
+        update_option('wp_donation_system_' . $gateway_id . '_settings', $settings);
+        
+        wp_send_json_success(array(
+            'message' => __('Gateway status updated successfully.', 'wp-donation-system')
+        ));
     }
 }

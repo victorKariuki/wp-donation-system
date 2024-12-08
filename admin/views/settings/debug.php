@@ -1,4 +1,28 @@
 <?php if (!defined('ABSPATH')) exit; ?>
+<div class="debug-section">
+    <h2><?php _e('System Information', 'wp-donation-system'); ?></h2>
+    
+    <table class="widefat debug-info">
+        <tbody>
+            <tr>
+                <th><?php _e('PHP Version', 'wp-donation-system'); ?></th>
+                <td><?php echo PHP_VERSION; ?></td>
+            </tr>
+            <tr>
+                <th><?php _e('WordPress Version', 'wp-donation-system'); ?></th>
+                <td><?php echo get_bloginfo('version'); ?></td>
+            </tr>
+            <tr>
+                <th><?php _e('Plugin Version', 'wp-donation-system'); ?></th>
+                <td><?php echo WP_DONATION_SYSTEM_VERSION; ?></td>
+            </tr>
+            <tr>
+                <th><?php _e('Debug Mode', 'wp-donation-system'); ?></th>
+                <td><?php echo WP_DEBUG ? __('Enabled', 'wp-donation-system') : __('Disabled', 'wp-donation-system'); ?></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 
 <div class="settings-section">
     <h2><?php _e('System Logs', 'wp-donation-system'); ?></h2>

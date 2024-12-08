@@ -1,417 +1,288 @@
 <?php
-class WP_Donation_System_MPesa {
-    private $settings;
-    private $logger;
-    private $environment;
+class WP_Donation_System_Gateway_MPesa extends WP_Donation_System_Gateway
+{
     private $consumer_key;
     private $consumer_secret;
-    private $business_shortcode;
     private $passkey;
+    private $shortcode;
+    private $environment;
+    private $type;
     private $callback_url;
-    private $business_number;
-    private $transactions;
-
+    
     public function __construct() {
-        $this->settings = get_option('wp_donation_system_settings', array());
-        require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
-        require_once WP_DONATION_SYSTEM_PATH . 'includes/class-mpesa-transaction.php';
-        $this->logger = new WP_Donation_System_Logger();
-        $this->transactions = new WP_Donation_System_MPesa_Transaction();
-        
-        // Initialize settings
-        $this->environment = $this->get_setting('mpesa_env', 'sandbox');
-        $this->consumer_key = $this->get_setting('mpesa_consumer_key', '');
-        $this->consumer_secret = $this->get_setting('mpesa_consumer_secret', '');
-        $this->business_shortcode = $this->get_setting('mpesa_shortcode', '');
-        $this->passkey = $this->get_setting('mpesa_passkey', '');
-        $this->business_number = $this->get_setting('mpesa_number', '');
-        
-        // Validate required credentials
-        if (empty($this->consumer_key) || empty($this->consumer_secret)) {
-            $this->logger->log('Missing M-Pesa credentials', 'error', [
-                'environment' => $this->environment,
-                'has_consumer_key' => !empty($this->consumer_key),
-                'has_consumer_secret' => !empty($this->consumer_secret)
-            ]);
-        }
-        
-        // Set callback URL - ensure it's a full, valid URL
-        $callback_base = site_url('/wp-json/wp-donation-system/v1/payment/callback');
-        $this->callback_url = esc_url_raw($callback_base);
+        $this->id = 'mpesa';
+        $this->title = __('M-Pesa Express', 'wp-donation-system');
+        $this->description = __('Accept donations via M-Pesa mobile money payments. Available for customers in Kenya.', 'wp-donation-system');
 
-        // Log initialization with callback URL validation
-        $this->logger->log('M-Pesa Gateway Initialized', 'debug', [
-            'environment' => $this->environment,
-            'business_shortcode' => $this->business_shortcode,
-            'callback_url' => $this->callback_url,
-            'callback_url_valid' => filter_var($this->callback_url, FILTER_VALIDATE_URL) !== false
-        ]);
+        parent::__construct();
+
+        // Load M-Pesa specific settings
+        $this->consumer_key = $this->settings['consumer_key'] ?? '';
+        $this->consumer_secret = $this->settings['consumer_secret'] ?? '';
+        $this->passkey = $this->settings['passkey'] ?? '';
+        $this->shortcode = $this->settings['shortcode'] ?? '';
+        $this->environment = $this->settings['environment'] ?? 'sandbox';
+        $this->type = $this->settings['type'] ?? 'till';
     }
 
-    /**
-     * Initiate STK Push
-     */
-    public function initiate_stk_push($payment_data) {
+    public function get_callback_url()
+    {
+        if (!$this->callback_url) {
+            $this->callback_url = rest_url('wp-donation-system/v1/mpesa-callback');
+        }
+        return $this->callback_url;
+    }
+
+    public function get_settings_fields()
+    {
+        return [
+            'enabled' => [
+                'title' => __('Enable/Disable', 'wp-donation-system'),
+                'type' => 'checkbox',
+                'label' => __('Enable M-Pesa payments', 'wp-donation-system'),
+                'default' => 'no'
+            ],
+            'environment' => [
+                'title' => __('Environment', 'wp-donation-system'),
+                'type' => 'select',
+                'options' => [
+                    'sandbox' => __('Sandbox', 'wp-donation-system'),
+                    'live' => __('Live', 'wp-donation-system')
+                ],
+                'default' => 'sandbox',
+                'description' => __('Select sandbox for testing or live for real transactions.', 'wp-donation-system')
+            ],
+            'type' => [
+                'title' => __('Type', 'wp-donation-system'),
+                'type' => 'select',
+                'options' => [
+                    'paybill' => __('Paybill', 'wp-donation-system'),
+                    'till' => __('Till', 'wp-donation-system')
+                ],
+                'default' => 'paybill',
+                'description' => __('Select your M-Pesa integration type.', 'wp-donation-system')
+            ],
+            'shortcode' => [
+                'title' => __('Shortcode', 'wp-donation-system'),
+                'type' => 'text',
+                'description' => __('Enter your M-Pesa Shortcode/Paybill', 'wp-donation-system'),
+                'required' => true
+            ],
+            'number' => [
+                'title' => __('Till Number / Paybill', 'wp-donation-system'),
+                'type' => 'text',
+                'description' => __('Enter your M-Pesa Till Number / Paybill', 'wp-donation-system'),
+                'required' => true
+            ],
+            'consumer_key' => [
+                'title' => __('Consumer Key', 'wp-donation-system'),
+                'type' => 'text',
+                'description' => __('Enter your M-Pesa API Consumer Key', 'wp-donation-system'),
+                'required' => true
+            ],
+            'consumer_secret' => [
+                'title' => __('Consumer Secret', 'wp-donation-system'),
+                'type' => 'password',
+                'description' => __('Enter your M-Pesa API Consumer Secret', 'wp-donation-system'),
+                'required' => true
+            ],
+            'passkey' => [
+                'title' => __('Passkey', 'wp-donation-system'),
+                'type' => 'password',
+                'description' => __('Enter your M-Pesa Passkey', 'wp-donation-system'),
+                'required' => true
+            ]
+        ];
+    }
+
+    public function validate_fields($data)
+    {
+        if (empty($data['donor_phone'])) {
+            throw new Exception(__('Phone number is required for M-Pesa payments', 'wp-donation-system'));
+        }
+
+        // Validate phone number format
+        if (!preg_match('/^254[0-9]{9}$/', $data['donor_phone'])) {
+            throw new Exception(__('Invalid phone number format. Use format: 254XXXXXXXXX', 'wp-donation-system'));
+        }
+
+        return true;
+    }
+
+    public function get_payment_fields()
+    {
+        return [
+            'donor_phone' => [
+                'type' => 'text',
+                'label' => __('M-Pesa Phone Number', 'wp-donation-system'),
+                'required' => true,
+                'placeholder' => '254XXXXXXXXX',
+                'description' => __('Enter your M-Pesa phone number', 'wp-donation-system'),
+                'value' => $this->settings['donor_phone'] ?? '',
+                'validation' => '/^254[0-9]{9}$/'
+            ]
+        ];
+    }
+
+    public function process_payment($donation_data)
+    {
         try {
-            $log_context = [
-                'payment_data' => $payment_data,
-                'environment' => $this->environment,
-                'shortcode' => $this->business_shortcode,
-                'request_time' => current_time('mysql')
-            ];
-            
-            // Validate credentials first
-            if (empty($this->consumer_key) || empty($this->consumer_secret)) {
-                $this->logger->log('M-Pesa credentials not configured', 'error', $log_context);
-                throw new Exception('M-Pesa credentials not configured');
-            }
+            $this->validate_fields($donation_data);
 
-            // Log the start of STK push process
-            $this->logger->log('Starting M-Pesa STK Push', 'info', $log_context);
-
-            // Validate required data
-            if (empty($payment_data['phone_number']) || empty($payment_data['amount'])) {
-                $log_context['validation_error'] = 'Missing required fields';
-                $this->logger->log('Missing required payment data', 'error', [
-                    ...$log_context,
-                    'missing_fields' => array_filter([
-                        'phone_number' => empty($payment_data['phone_number']),
-                        'amount' => empty($payment_data['amount'])
-                    ])
-                ]);
-                throw new Exception('Missing required payment data');
-            }
-
-            // Validate callback URL
-            if (!filter_var($this->callback_url, FILTER_VALIDATE_URL)) {
-                $log_context['validation_error'] = 'Invalid callback URL';
-                $this->logger->log('Invalid callback URL', 'error', [
-                    ...$log_context,
-                    'callback_url' => $this->callback_url
-                ]);
-                throw new Exception('Invalid callback URL configuration');
-            }
-
-            // Get access token
-            $this->logger->log('Requesting M-Pesa access token', 'debug', $log_context);
-            $access_token = $this->get_access_token();
-            
-            if (!$access_token) {
-                $log_context['error_type'] = 'access_token_failure';
-                $this->logger->log('Failed to get M-Pesa access token', 'error');
-                throw new Exception('Failed to get access token');
-            }
-
-            // Prepare STK Push request
-            $timestamp = date('YmdHis');
-            $password = base64_encode($this->business_shortcode . $this->passkey . $timestamp);
-            
-            $stk_request_data = array(
-                'BusinessShortCode' => $this->business_shortcode,
-                'Password' => $password,
-                'Timestamp' => $timestamp,
-                'TransactionType' => $this->get_setting('mpesa_type', 'till') === 'till' ? 'CustomerBuyGoodsOnline' : 'CustomerPayBillOnline',
-                'Amount' => ceil($payment_data['amount']),
-                'PartyA' => $payment_data['phone_number'],
-                'PartyB' => $this->business_number,
-                'PhoneNumber' => $payment_data['phone_number'],
-                'CallBackURL' => $this->callback_url,
-                'AccountReference' => $this->get_setting('mpesa_account_ref', 'DONATION').'-'.$payment_data['donation_id'],
-                'TransactionDesc' => $this->get_setting('mpesa_transaction_desc', 'Donation Payment')
-            );
-
-            // Log the STK push request
-            $log_context['request_data'] = $stk_request_data;
-            $log_context['api_url'] = $this->get_api_url('stkpush');
-            $this->logger->log('Sending M-Pesa STK Push request', 'debug', [
-                ...$log_context,
-                'request_id' => uniqid('stk_', true)
+            // Initialize STK Push
+            $stk_response = $this->initiate_stk_push([
+                'phone_number' => $donation_data['donor_phone'],
+                'amount' => $donation_data['amount'],
+                'donation_id' => $donation_data['donation_id']
             ]);
 
-            // Make API request
-            $response = wp_remote_post($this->get_api_url('stkpush'), array(
-                'headers' => array(
+            if (!$stk_response->success) {
+                throw new Exception($stk_response->message);
+            }
+
+            return [
+                'result' => 'success',
+                'redirect' => false,
+                'checkout_request_id' => $stk_response->checkout_request_id
+            ];
+
+        } catch (Exception $e) {
+            $this->log('Payment processing failed: ' . $e->getMessage(), 'error', $donation_data);
+            throw $e;
+        }
+    }
+
+    private function initiate_stk_push($data)
+    {
+        try {
+            $access_token = $this->get_access_token();
+
+            $timestamp = date('YmdHis');
+            $password = base64_encode($this->shortcode . $this->passkey . $timestamp);
+
+            $api_url = $this->get_api_url('mpesa/stkpush/v1/processrequest');
+
+            $body = [
+                'BusinessShortCode' => $this->shortcode,
+                'Password' => $password,
+                'Timestamp' => $timestamp,
+                'TransactionType' => $this->type === 'paybill' ? 'CustomerPayBillOnline' : 'CustomerBuyGoodsOnline',
+                'Amount' => $data['amount'],
+                'PartyA' => $data['phone_number'],
+                'PartyB' => $this->shortcode,
+                'PhoneNumber' => $data['phone_number'],
+                'CallBackURL' => $this->get_callback_url(),
+                'AccountReference' => 'Donation #' . $data['donation_id'],
+                'TransactionDesc' => 'Donation Payment'
+            ];
+
+            $response = wp_remote_post($api_url, [
+                'headers' => [
                     'Authorization' => 'Bearer ' . $access_token,
                     'Content-Type' => 'application/json'
-                ),
-                'body' => wp_json_encode($stk_request_data)
-            ));
-
-            // Log the raw response
-            $log_context['response'] = $response;
-            $log_context['response_code'] = wp_remote_retrieve_response_code($response);
-            $this->logger->log('Received M-Pesa STK Push response', 'debug', [
-                ...$log_context
+                ],
+                'body' => json_encode($body)
             ]);
 
             if (is_wp_error($response)) {
-                $log_context['error_type'] = 'api_request_failed';
-                $log_context['error_message'] = $response->get_error_message();
-                $this->logger->log('M-Pesa API request failed', 'error', [
-                    ...$log_context
-                ]);
                 throw new Exception($response->get_error_message());
             }
 
-            $body = json_decode(wp_remote_retrieve_body($response));
+            $result = json_decode(wp_remote_retrieve_body($response));
 
-            if (!$body) {
-                $log_context['error_type'] = 'invalid_response';
-                $log_context['raw_body'] = wp_remote_retrieve_body($response);
-                $this->logger->log('Invalid M-Pesa response format', 'error', [
-                    ...$log_context
-                ]);
-                throw new Exception('Invalid response from M-Pesa');
+            if (!isset($result->ResponseCode) || $result->ResponseCode !== '0') {
+                throw new Exception($result->errorMessage ?? 'STK push failed');
             }
 
-            // Log the parsed response
-            $log_context['parsed_response'] = $body;
-            $this->logger->log('Parsed M-Pesa response', 'debug', [
-                ...$log_context
-            ]);
-
-            // Check response code with proper error handling
-            $responseCode = isset($body->ResponseCode) ? $body->ResponseCode : null;
-            if ($responseCode !== '0') {
-                $errorMessage = isset($body->errorMessage) ? $body->errorMessage : 
-                    (isset($body->ResponseDescription) ? $body->ResponseDescription : 'STK Push failed');
-                
-                $log_context['error_type'] = 'stk_push_failed';
-                $log_context['error_message'] = $errorMessage;
-                $this->logger->log('M-Pesa STK Push failed', 'error', [
-                    ...$log_context,
-                    'response_code' => $responseCode
-                ]);
-                
-                throw new Exception($errorMessage);
-            }
-
-            // Log successful STK push
-            $log_context['checkout_request_id'] = $body->CheckoutRequestID ?? null;
-            $log_context['merchant_request_id'] = $body->MerchantRequestID ?? null;
-            $this->logger->log('M-Pesa STK Push successful', 'info', [
-                ...$log_context,
-                'response_description' => $body->ResponseDescription ?? '',
-                'completion_time' => current_time('mysql')
-            ]);
-
-            // Save transaction record
-            $transaction_id = $this->transactions->save_stk_request(
-                $payment_data['donation_id'],
-                $stk_request_data,
-                $body
-            );
-            
-            if (!$transaction_id) {
-                throw new Exception('Failed to save transaction record');
-            }
-
-            return (object) array(
+            return (object) [
                 'success' => true,
-                'checkout_request_id' => $body->CheckoutRequestID ?? null,
-                'merchant_request_id' => $body->MerchantRequestID ?? null
-            );
+                'checkout_request_id' => $result->CheckoutRequestID,
+                'message' => 'STK push initiated successfully'
+            ];
 
         } catch (Exception $e) {
-            $log_context['error_type'] = 'stk_push_exception';
-            $log_context['error_message'] = $e->getMessage();
-            $log_context['error_trace'] = $e->getTraceAsString();
-            $this->logger->log('STK Push process failed', 'error', [
-                ...$log_context
-            ]);
-
-            return (object) array(
+            $this->log('STK push failed: ' . $e->getMessage(), 'error', $data);
+            return (object) [
                 'success' => false,
                 'message' => $e->getMessage()
-            );
+            ];
         }
     }
 
-    /**
-     * Get M-Pesa API access token
-     */
     private function get_access_token() {
-        // Validate credentials before making request
-        if (empty($this->consumer_key) || empty($this->consumer_secret)) {
-            $this->logger->log('Cannot get access token - missing credentials', 'error');
-            return false;
+        $cache_key = 'mpesa_access_token_' . $this->environment;
+        $access_token = get_transient($cache_key);
+
+        if ($access_token) {
+            return $access_token;
         }
 
         $credentials = base64_encode($this->consumer_key . ':' . $this->consumer_secret);
-        
-        // Log the request (without sensitive data)
-        $this->logger->log('Requesting M-Pesa access token', 'debug', [
-            'environment' => $this->environment,
-            'api_url' => $this->get_api_url('oauth')
-        ]);
-        
-        $response = wp_remote_get($this->get_api_url('oauth'), array(
-            'headers' => array(
+        $api_url = $this->get_api_url('oauth/v1/generate?grant_type=client_credentials');
+
+        $response = wp_remote_get($api_url, [
+            'headers' => [
                 'Authorization' => 'Basic ' . $credentials
-            )
-        ));
+            ]
+        ]);
 
         if (is_wp_error($response)) {
-            $this->logger->log('Access token request failed', 'error', [
-                'error' => $response->get_error_message()
-            ]);
-            return false;
+            throw new Exception($response->get_error_message());
         }
 
-        $body = json_decode(wp_remote_retrieve_body($response));
-        
-        if (!isset($body->access_token)) {
-            // Log the error response
-            $this->logger->log('Invalid access token response', 'error', [
-                'response' => $body,
-                'http_code' => wp_remote_retrieve_response_code($response),
-                'environment' => $this->environment
-            ]);
-            return false;
+        $result = json_decode(wp_remote_retrieve_body($response));
+
+        if (!isset($result->access_token)) {
+            throw new Exception('Failed to get access token');
         }
 
-        // Verify the token looks valid
-        if (!is_string($body->access_token) || strlen($body->access_token) < 10) {
-            $this->logger->log('Suspicious access token received', 'error', [
-                'token_length' => strlen($body->access_token)
-            ]);
-            return false;
-        }
+        set_transient($cache_key, $result->access_token, 3500); // Token expires in 1 hour
 
-        $this->logger->log('Successfully obtained access token', 'debug');
-        return $body->access_token;
+        return $result->access_token;
     }
 
-    /**
-     * Get API URL based on environment
-     */
     private function get_api_url($endpoint) {
-        $base_url = $this->environment === 'live' 
-            ? 'https://api.safaricom.co.ke' 
-            : 'https://sandbox.safaricom.co.ke';
+        $base_url = $this->environment === 'live'
+            ? 'https://api.safaricom.co.ke/'
+            : 'https://sandbox.safaricom.co.ke/';
 
-        $url = '';
-        switch ($endpoint) {
-            case 'oauth':
-                $url = $base_url . '/oauth/v1/generate?grant_type=client_credentials';
-                break;
-            case 'stkpush':
-                $url = $base_url . '/mpesa/stkpush/v1/processrequest';
-                break;
-        }
+        return $base_url . $endpoint;
+    }
 
-        $this->logger->log('Generated API URL', 'debug', [
-            'endpoint' => $endpoint,
-            'environment' => $this->environment,
-            'url' => $url
-        ]);
+    protected function load_settings()
+    {
+        $this->settings = get_option('wp_donation_system_' . $this->id . '_settings', []);
+        $this->enabled = isset($this->settings['enabled']) ? $this->settings['enabled'] : false;
+        
+        // Load specific settings
+        $this->consumer_key = $this->settings['consumer_key'] ?? '';
+        $this->consumer_secret = $this->settings['consumer_secret'] ?? '';
+        $this->passkey = $this->settings['passkey'] ?? '';
+        $this->shortcode = $this->settings['shortcode'] ?? '';
+        $this->environment = $this->settings['environment'] ?? 'sandbox';
+        $this->type = $this->settings['type'] ?? 'paybill';
+    }
 
-        return $url;
+    public function has_test_mode()
+    {
+        return true;
     }
 
     /**
-     * Get setting value with default
+     * Get security badge URL
+     * 
+     * @return string|false Security badge URL or false if none
      */
-    private function get_setting($key, $default = '') {
-        $value = isset($this->settings[$key]) ? $this->settings[$key] : $default;
-        
-        $this->logger->log('Retrieved setting', 'debug', [
-            'key' => $key,
-            'value' => $value === $this->consumer_secret ? '[REDACTED]' : $value
-        ]);
-        
-        return $value;
+    public function get_security_badge() {
+        return false; // M-Pesa doesn't have a security badge
     }
 
     /**
-     * Test credentials with minimal transaction
+     * Get fields title
+     * 
+     * @return string
      */
-    public function test_credentials($phone_number) {
-        try {
-            if (empty($phone_number)) {
-                throw new Exception('Phone number is required for testing');
-            }
-
-            // Format phone number (remove + and ensure 254 prefix)
-            $phone_number = preg_replace('/[^0-9]/', '', $phone_number);
-            if (strlen($phone_number) === 9) {
-                $phone_number = '254' . $phone_number;
-            } elseif (strlen($phone_number) === 10) {
-                $phone_number = '254' . substr($phone_number, 1);
-            }
-
-            if (!preg_match('/^254[0-9]{9}$/', $phone_number)) {
-                throw new Exception('Invalid phone number format. Use format: 254XXXXXXXXX');
-            }
-
-            $test_amount = 5; // 5 KES minimum test amount
-            
-            // Create a test donation record
-            require_once WP_DONATION_SYSTEM_PATH . 'includes/class-database.php';
-            $database = new WP_Donation_System_Database();
-            
-            $donation_data = [
-                'donor_name' => 'Test Transaction',
-                'donor_email' => get_option('admin_email'),
-                'donor_phone' => $phone_number,
-                'amount' => $test_amount,
-                'currency' => 'KES',
-                'payment_method' => 'mpesa',
-                'status' => 'pending',
-                'metadata' => wp_json_encode(['test_transaction' => true])
-            ];
-            
-            $donation_id = $database->insert_donation($donation_data);
-            if (!$donation_id) {
-                throw new Exception('Failed to create test donation record');
-            }
-            
-            $payment_data = [
-                'amount' => $test_amount,
-                'phone_number' => $phone_number,
-                'donation_id' => $donation_id
-            ];
-
-            $this->logger->log('Initiating test transaction', 'info', [
-                'phone' => $phone_number,
-                'amount' => $test_amount,
-                'donation_id' => $donation_id
-            ]);
-
-            $response = $this->initiate_stk_push($payment_data);
-
-            if (!$response->success) {
-                // Update donation status to failed
-                $database->update_donation($donation_id, [
-                    'status' => 'failed',
-                    'notes' => $response->message
-                ]);
-                throw new Exception($response->message);
-            }
-
-            // Update donation with checkout request ID
-            $database->update_donation($donation_id, [
-                'checkout_request_id' => $response->checkout_request_id,
-                'merchant_request_id' => $response->merchant_request_id,
-                'status' => 'processing'
-            ]);
-
-            return [
-                'success' => true,
-                'message' => 'Test transaction initiated. Please check your phone for the STK push.',
-                'checkout_request_id' => $response->checkout_request_id,
-                'donation_id' => $donation_id
-            ];
-
-        } catch (Exception $e) {
-            $this->logger->log('Test transaction failed', 'error', [
-                'error' => $e->getMessage()
-            ]);
-
-            return [
-                'success' => false,
-                'message' => $e->getMessage()
-            ];
-        }
+    public function get_fields_title() {
+        return __('Enter M-Pesa Payment Details', 'wp-donation-system');
     }
-} 
+}

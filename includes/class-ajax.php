@@ -79,71 +79,49 @@ class WP_Donation_System_Ajax {
             // Process payment based on method
             switch ($donation_data['payment_method']) {
                 case 'mpesa':
-                    $this->logger->log('Initiating M-Pesa STK push', 'info');
+                case 'paypal':
+                    $gateway_manager = WP_Donation_System_Gateway_Manager::get_instance();
+                    $gateway = $gateway_manager->get_gateway($donation_data['payment_method']);
                     
-                    // Load M-Pesa gateway
-                    require_once WP_DONATION_SYSTEM_PATH . 'includes/gateways/class-mpesa.php';
-                    $mpesa = new WP_Donation_System_MPesa();
-                    
-                    try {
-                        // Prepare payment data
-                        $payment_data = [
-                            'phone_number' => $donation_data['donor_phone'],
-                            'amount' => $donation_data['amount'],
-                            'donation_id' => $donation_id
-                        ];
-                        
-                        $this->logger->log('Processing M-Pesa payment', 'debug', [
-                            'payment_data' => $payment_data
-                        ]);
-                        
-                        // Initiate STK push
-                        $stk_response = $mpesa->initiate_stk_push($payment_data);
-                        
-                        if (!$stk_response->success) {
-                            throw new Exception($stk_response->message);
-                        }
-                        
-                        // Ensure we have the required response data
-                        if (empty($stk_response->checkout_request_id)) {
-                            throw new Exception('Invalid M-Pesa response: Missing checkout request ID');
-                        }
-                        
-                        // Update donation with checkout request ID
-                        $update_result = $this->database->update_donation($donation_id, [
-                            'checkout_request_id' => $stk_response->checkout_request_id,
-                            'status' => 'processing'
-                        ]);
-
-                        if (!$update_result) {
-                            throw new Exception('Failed to update donation with checkout request ID');
-                        }
-                        
-                        $this->logger->log('M-Pesa STK push successful', 'info', [
-                            'checkout_request_id' => $stk_response->checkout_request_id,
-                            'donation_id' => $donation_id
-                        ]);
-                        
-                        wp_send_json_success([
-                            'message' => __('Please check your phone to complete the payment.', 'wp-donation-system'),
-                            'donation_id' => $donation_id,
-                            'payment_method' => 'mpesa'
-                        ]);
-                        
-                    } catch (Exception $e) {
-                        $this->logger->log('M-Pesa payment failed', 'error', [
-                            'error' => $e->getMessage(),
-                            'donation_id' => $donation_id
-                        ]);
-                        
-                        // Update donation status to failed
-                        $this->database->update_donation($donation_id, [
-                            'status' => 'failed',
-                            'notes' => $e->getMessage()
-                        ]);
-                        
-                        throw new Exception(__('Failed to initiate M-Pesa payment. Please try again.', 'wp-donation-system'));
+                    if (!$gateway || !$gateway->is_enabled()) {
+                        throw new Exception(sprintf(
+                            __('%s gateway is not available', 'wp-donation-system'),
+                            ucfirst($donation_data['payment_method'])
+                        ));
                     }
+                    
+                    $result = $gateway->process_payment([
+                        'donor_phone' => $donation_data['donor_phone'] ?? '',
+                        'amount' => $donation_data['amount'],
+                        'donation_id' => $donation_id,
+                        'currency' => $donation_data['currency'] ?? 'USD'
+                    ]);
+
+                    if ($result['result'] !== 'success') {
+                        throw new Exception($result['message'] ?? __('Payment processing failed', 'wp-donation-system'));
+                    }
+
+                    // Update donation status
+                    $update_data = ['status' => 'processing'];
+                    if (isset($result['checkout_request_id'])) {
+                        $update_data['checkout_request_id'] = $result['checkout_request_id'];
+                    }
+                    $this->database->update_donation($donation_id, $update_data);
+
+                    // Handle redirect if needed
+                    $response_data = [
+                        'donation_id' => $donation_id,
+                        'payment_method' => $donation_data['payment_method']
+                    ];
+
+                    if (!empty($result['redirect']) && !empty($result['redirect_url'])) {
+                        $response_data['redirect'] = true;
+                        $response_data['redirect_url'] = $result['redirect_url'];
+                    } else {
+                        $response_data['message'] = __('Please complete the payment process.', 'wp-donation-system');
+                    }
+
+                    wp_send_json_success($response_data);
                     break;
 
                 default:

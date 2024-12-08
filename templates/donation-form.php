@@ -21,7 +21,9 @@
         </div>
     </div>
 
-    <form id="donation-form" method="post">
+    <form id="donation-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+        <input type="hidden" name="action" value="process_donation">
+
         <!-- Step 1: Amount Selection -->
         <div class="form-step active" data-step="1">
             <div class="form-section">
@@ -67,20 +69,34 @@
             </div>
         </div>
 
-        <!-- Step 2: Donor Information -->
+        <!-- Step 2: Donor Details -->
         <div class="form-step" data-step="2">
             <div class="form-section">
-                <h2><?php _e('Your Information', 'wp-donation-system'); ?></h2>
+                <h2><?php _e('Donor Information', 'wp-donation-system'); ?></h2>
                 
                 <div class="input-group">
-                    <label for="donor_name"><?php _e('Full Name', 'wp-donation-system'); ?></label>
-                    <input type="text" id="donor_name" name="donor_name" required>
+                    <label for="donor_name">
+                        <?php _e('Full Name', 'wp-donation-system'); ?>
+                        <span class="required">*</span>
+                    </label>
+                    <input type="text" 
+                        id="donor_name" 
+                        name="donor_name" 
+                        required>
                 </div>
 
                 <div class="input-group">
-                    <label for="donor_email"><?php _e('Email Address', 'wp-donation-system'); ?></label>
-                    <input type="email" id="donor_email" name="donor_email" required>
-                    <div class="input-hint"><?php _e('For donation receipt and updates', 'wp-donation-system'); ?></div>
+                    <label for="donor_email">
+                        <?php _e('Email Address', 'wp-donation-system'); ?>
+                        <span class="required">*</span>
+                    </label>
+                    <input type="email" 
+                        id="donor_email" 
+                        name="donor_email" 
+                        required>
+                    <div class="input-hint">
+                        <?php _e('Your donation receipt will be sent to this email.', 'wp-donation-system'); ?>
+                    </div>
                 </div>
             </div>
 
@@ -100,28 +116,62 @@
         <div class="form-step" data-step="3">
             <div class="form-section">
                 <h2><?php _e('Payment Method', 'wp-donation-system'); ?></h2>
-
+                
                 <div class="payment-methods">
-                    <div class="payment-method">
-                        <input type="radio" id="payment_mpesa" name="payment_method" value="mpesa" required>
-                        <label for="payment_mpesa">
-                            <img src="<?php echo esc_url(WP_DONATION_SYSTEM_URL . 'assets/images/mpesa.png'); ?>" alt="M-Pesa">
-                            <span class="method-name"><?php _e('M-Pesa', 'wp-donation-system'); ?></span>
-                        </label>
-                    </div>
-                </div>
+                    <?php 
+                    $gateway_manager = WP_Donation_System_Gateway_Manager::get_instance();
+                    $available_gateways = $gateway_manager->get_available_gateways();
+                    
+                    foreach ($available_gateways as $gateway): 
+                        $gateway_id = $gateway->get_id();
+                    ?>
+                        <div class="payment-option">
+                            <input type="radio" 
+                                id="payment_<?php echo esc_attr($gateway_id); ?>" 
+                                name="payment_method" 
+                                value="<?php echo esc_attr($gateway_id); ?>" 
+                                class="payment-radio"
+                                required>
+                            <label for="payment_<?php echo esc_attr($gateway_id); ?>" class="payment-label">
+                                <div class="payment-header">
+                                    <img src="<?php echo esc_url(WP_DONATION_SYSTEM_URL . 'assets/images/' . $gateway_id . '.png'); ?>" 
+                                        alt="<?php echo esc_attr($gateway->get_title()); ?>"
+                                        class="payment-icon">
+                                    <div class="payment-info">
+                                        <span class="payment-name"><?php echo esc_html($gateway->get_title()); ?></span>
+                                        <span class="payment-desc"><?php echo esc_html($gateway->get_description()); ?></span>
+                                    </div>
+                                    <div class="payment-check"></div>
+                                </div>
+                            </label>
 
-                <div id="mpesa-details" class="payment-details" style="display: none;">
-                    <div class="input-group">
-                        <label for="phone_number"><?php _e('M-Pesa Phone Number', 'wp-donation-system'); ?></label>
-                        <input type="tel" 
-                            id="phone_number" 
-                            name="phone_number" 
-                            pattern="^254[0-9]{9}$" 
-                            placeholder="254700000000" 
-                            required>
-                        <div class="input-hint"><?php _e('Enter your M-Pesa number starting with 254', 'wp-donation-system'); ?></div>
-                    </div>
+                            <?php if (!empty($gateway->get_payment_fields())): ?>
+                                <div class="payment-fields">
+                                    <div class="fields-wrapper">
+                                        <?php foreach ($gateway->get_payment_fields() as $field_id => $field): ?>
+                                            <div class="field-row">
+                                                <label for="<?php echo esc_attr($field_id); ?>">
+                                                    <?php echo esc_html($field['label']); ?>
+                                                    <?php if (!empty($field['required'])): ?>
+                                                        <span class="required">*</span>
+                                                    <?php endif; ?>
+                                                </label>
+                                                <input type="<?php echo esc_attr($field['type']); ?>"
+                                                    id="<?php echo esc_attr($field_id); ?>"
+                                                    name="<?php echo esc_attr($field_id); ?>"
+                                                    class="gateway-field"
+                                                    <?php echo !empty($field['required']) ? 'required' : ''; ?>
+                                                    <?php echo !empty($field['placeholder']) ? 'placeholder="' . esc_attr($field['placeholder']) . '"' : ''; ?>>
+                                                <?php if (!empty($field['hint'])): ?>
+                                                    <span class="field-hint"><?php echo esc_html($field['hint']); ?></span>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
@@ -131,15 +181,21 @@
                     <?php _e('Back', 'wp-donation-system'); ?>
                 </button>
                 <button type="submit" class="submit-donation primary-button">
-                    <?php _e('Complete Donation', 'wp-donation-system'); ?>
+                    <span class="button-text"><?php _e('Complete Donation', 'wp-donation-system'); ?></span>
+                    <span class="loading-spinner"></span>
                 </button>
             </div>
-
-            <!-- Donation Message -->
-            <div class="donation-message" style="display: none;"></div>
         </div>
 
-        <?php wp_nonce_field('donation_form_nonce', 'donation_nonce'); ?>
+        <?php wp_nonce_field('process_donation', 'donation_nonce'); ?>
     </form>
 </div>
 
+<script>
+console.log(' Donation Form Template Loaded');
+if (typeof jQuery === 'undefined') {
+    console.error('❌ jQuery not loaded!');
+} else {
+    console.log('✅ jQuery version:', jQuery.fn.jquery);
+}
+</script>
