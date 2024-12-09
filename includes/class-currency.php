@@ -126,4 +126,40 @@ class WP_Donation_System_Currency {
         $currency_data = $this->get_currency($currency);
         return $currency_data ? $currency_data['symbol'] : '';
     }
+
+    /**
+     * Format an amount according to the currency settings
+     *
+     * @param float $amount The amount to format
+     * @return string Formatted amount with currency symbol
+     */
+    public function format_amount($amount) {
+        $currency_symbol = $this->get_currency_symbol();
+        $decimal_places = $this->get_decimal_places();
+        
+        // Format the number with proper decimal places
+        $formatted_amount = number_format($amount, $decimal_places, '.', ',');
+        
+        // Return formatted amount with currency symbol
+        return $currency_symbol . $formatted_amount;
+    }
+
+    /**
+     * Get currency symbol
+     *
+     * @return string Currency symbol
+     */
+    private function get_currency_symbol() {
+        // Default to USD symbol if not set
+        return get_option('wpds_currency_symbol', '$');
+    }
+
+    /**
+     * Get number of decimal places for currency
+     *
+     * @return int Number of decimal places
+     */
+    private function get_decimal_places() {
+        return (int) get_option('wpds_decimal_places', 2);
+    }
 } 

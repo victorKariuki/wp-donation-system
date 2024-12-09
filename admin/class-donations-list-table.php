@@ -434,8 +434,12 @@ class WP_Donation_System_List_Table extends WP_List_Table {
      */
     public function get_total_amount() {
         global $wpdb;
-        $total = $wpdb->get_var("SELECT SUM(amount) FROM {$wpdb->prefix}donations WHERE status = 'completed'");
-        return $this->currency->format_amount($total ?: 0);
+        $table_name = $wpdb->prefix . 'donation_system_donations';
+        
+        $total = $wpdb->get_var("SELECT SUM(amount) FROM $table_name");
+        $currency = new WP_Donation_System_Currency();
+        
+        return $currency->format_amount($total ?: 0);
     }
 
     /**

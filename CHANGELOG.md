@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2024-03-20
+## [2.0.1] - 2024-03-XX
+
+### Fixed
+- Fixed fatal error related to undefined method `format_amount()` in Currency class
+- Updated donation list table to properly use Currency class formatting methods
+- Improved currency formatting consistency across the plugin
+
+## [2.0.0] - Previous version
 
 ### Breaking Changes
 - Complete redesign of donation form interface
