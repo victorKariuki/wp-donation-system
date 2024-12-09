@@ -29,7 +29,7 @@ class WP_Donation_System_Database {
             error_log('WP Donation System: Attempting to create database tables');
             
             // Donations table
-            $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}donations (
+            $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}donation_system_donations (
                 id bigint(20) NOT NULL AUTO_INCREMENT,
                 donor_name varchar(100) NOT NULL,
                 donor_email varchar(100) NOT NULL,
@@ -63,7 +63,7 @@ class WP_Donation_System_Database {
             error_log('WP Donation System: Database creation results: ' . print_r($results, true));
             
             // Verify table exists
-            $table_name = $wpdb->prefix . 'donations';
+            $table_name = $wpdb->prefix . 'donation_system_donations';
             $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
             
             if (!$table_exists) {
@@ -123,7 +123,7 @@ class WP_Donation_System_Database {
         );
 
         $result = $wpdb->insert(
-            $wpdb->prefix . 'donations',
+            $wpdb->prefix . 'donation_system_donations',
             $insert_data,
             $format
         );
@@ -166,7 +166,7 @@ class WP_Donation_System_Database {
         }
 
         $result = $wpdb->update(
-            $wpdb->prefix . 'donations',
+            $wpdb->prefix . 'donation_system_donations',
             $data,
             array('id' => $donation_id),
             $format,
@@ -198,7 +198,7 @@ class WP_Donation_System_Database {
     public function get_donation($donation_id) {
         global $wpdb;
         return $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}donations WHERE id = %d",
+            "SELECT * FROM {$wpdb->prefix}donation_system_donations WHERE id = %d",
             $donation_id
         ));
     }
@@ -208,7 +208,7 @@ class WP_Donation_System_Database {
      */
     public function update_tables() {
         global $wpdb;
-        $table_name = $wpdb->prefix . 'donations';
+        $table_name = $wpdb->prefix . 'donation_system_donations';
         
         // Check if payment_status column exists and status doesn't
         $row = $wpdb->get_results("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
@@ -277,7 +277,7 @@ class WP_Donation_System_Database {
 
             // Perform the insertion
             $result = $wpdb->insert(
-                $wpdb->prefix . 'donations',
+                $wpdb->prefix . 'donation_system_donations',
                 $insert_data,
                 $format
             );
@@ -337,7 +337,7 @@ class WP_Donation_System_Database {
 
             // Perform update
             $result = $wpdb->update(
-                $wpdb->prefix . 'donations',
+                $wpdb->prefix . 'donation_system_donations',
                 $data,
                 ['id' => $donation_id],
                 $format,
