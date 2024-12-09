@@ -21,7 +21,8 @@
         </div>
     </div>
 
-    <form id="donation-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+    <form id="donation-form" method="post" onsubmit="return false;">
+        <?php wp_nonce_field('process_donation', 'donation_nonce'); ?>
         <input type="hidden" name="action" value="process_donation">
 
         <!-- Step 1: Amount Selection -->
@@ -38,7 +39,7 @@
                 </div>
 
                 <!-- Custom Amount -->
-                <div class="custom-amount">
+                <div class="custom-amount-wrapper">
                     <label for="donation_amount"><?php _e('Custom Amount', 'wp-donation-system'); ?></label>
                     <div class="amount-input">
                         <span class="currency">KSh</span>
@@ -82,7 +83,8 @@
                     <input type="text" 
                         id="donor_name" 
                         name="donor_name" 
-                        required>
+                        required
+                        autocomplete="name">
                 </div>
 
                 <div class="input-group">
@@ -93,9 +95,25 @@
                     <input type="email" 
                         id="donor_email" 
                         name="donor_email" 
-                        required>
+                        required
+                        autocomplete="email">
                     <div class="input-hint">
                         <?php _e('Your donation receipt will be sent to this email.', 'wp-donation-system'); ?>
+                    </div>
+                </div>
+
+                <!-- Anonymous Donation Option -->
+                <div class="input-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" 
+                            id="anonymous_donation" 
+                            name="anonymous_donation">
+                        <span class="checkbox-text">
+                            <?php _e('Make this donation anonymous', 'wp-donation-system'); ?>
+                        </span>
+                    </label>
+                    <div class="input-hint">
+                        <?php _e('Your name will appear as "Anonymous Guest" publicly', 'wp-donation-system'); ?>
                     </div>
                 </div>
             </div>
@@ -156,14 +174,17 @@
                                                         <span class="required">*</span>
                                                     <?php endif; ?>
                                                 </label>
-                                                <input type="<?php echo esc_attr($field['type']); ?>"
+                                                <input 
+                                                    type="<?php echo esc_attr($field['type']); ?>"
                                                     id="<?php echo esc_attr($field_id); ?>"
                                                     name="<?php echo esc_attr($field_id); ?>"
                                                     class="gateway-field"
                                                     <?php echo !empty($field['required']) ? 'required' : ''; ?>
+                                                    <?php echo !empty($field['pattern']) ? 'pattern="' . esc_attr($field['pattern']) . '"' : ''; ?>
+                                                    <?php echo !empty($field['maxlength']) ? 'maxlength="' . esc_attr($field['maxlength']) . '"' : ''; ?>
                                                     <?php echo !empty($field['placeholder']) ? 'placeholder="' . esc_attr($field['placeholder']) . '"' : ''; ?>>
                                                 <?php if (!empty($field['hint'])): ?>
-                                                    <span class="field-hint"><?php echo esc_html($field['hint']); ?></span>
+                                                    <div class="field-hint"><?php echo esc_html($field['hint']); ?></div>
                                                 <?php endif; ?>
                                             </div>
                                         <?php endforeach; ?>
@@ -186,8 +207,6 @@
                 </button>
             </div>
         </div>
-
-        <?php wp_nonce_field('process_donation', 'donation_nonce'); ?>
     </form>
 </div>
 

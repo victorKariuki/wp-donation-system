@@ -88,7 +88,7 @@ class WP_Donation_System_Form {
                 'code' => $default_currency,
                 'data' => $currency_data
             ),
-            'i18n' => array(
+            'strings' => array(
                 'invalid_amount' => __('Please enter a valid donation amount.', 'wp-donation-system'),
                 'amount_range' => __('Please enter an amount between {min} and {max}.', 'wp-donation-system'),
                 'required_field' => __('This field is required.', 'wp-donation-system'),
@@ -96,19 +96,24 @@ class WP_Donation_System_Form {
                 'select_payment' => __('Please select a payment method.', 'wp-donation-system'),
                 'invalid_phone' => __('Please enter a valid M-Pesa phone number starting with 254.', 'wp-donation-system'),
                 'processing' => __('Processing...', 'wp-donation-system'),
-                'donate' => __('Complete Donation', 'wp-donation-system'),
+                'complete_donation' => __('Complete Donation', 'wp-donation-system'),
                 'error' => __('An error occurred. Please try again.', 'wp-donation-system'),
                 'waiting_payment' => __('Waiting for payment...', 'wp-donation-system'),
                 'payment_timeout' => __('Payment timeout. Please try again.', 'wp-donation-system'),
                 'retry_payment' => __('Retry Payment', 'wp-donation-system'),
-            ),
-            'mpesa_waiting_title' => __('Waiting for M-Pesa Payment', 'wp-donation-system'),
-            'mpesa_waiting_message' => __('Please check your phone and enter your M-Pesa PIN to complete the payment.', 'wp-donation-system'),
-            'mpesa_timeout' => __('M-Pesa payment request timed out. Please try again.', 'wp-donation-system'),
-            'seconds_remaining' => __('seconds remaining', 'wp-donation-system'),
-            'cancel_payment' => __('Cancel Payment', 'wp-donation-system'),
-            'retry_payment' => __('Try Again', 'wp-donation-system'),
-            'complete_required_fields' => __('Please complete all required fields.', 'wp-donation-system'),
+                'mpesa_waiting_title' => __('Waiting for M-Pesa Payment', 'wp-donation-system'),
+                'mpesa_waiting_message' => __('Please check your phone and enter your M-Pesa PIN to complete the payment.', 'wp-donation-system'),
+                'seconds_remaining' => __('seconds remaining', 'wp-donation-system'),
+                'cancel_payment' => __('Cancel Payment', 'wp-donation-system'),
+                'pay_with' => __('Pay {amount} with {gateway}', 'wp-donation-system'),
+                'name_required' => __('Name is required.', 'wp-donation-system'),
+                'email_required' => __('Email is required.', 'wp-donation-system'),
+                'complete_required_fields' => __('Please complete all required fields.', 'wp-donation-system'),
+                'network_error' => __('Network error occurred. Please try again.', 'wp-donation-system'),
+                'anonymous_name' => __('Anonymous Guest', 'wp-donation-system'),
+                'anonymous_email_domain' => get_site_url(),
+                'anonymous_hint' => __('Your identity will be kept private', 'wp-donation-system'),
+            )
         ));
     }
 }

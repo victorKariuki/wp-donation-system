@@ -17,22 +17,17 @@ class WP_Donation_System_Ajax {
      * Process donation submission
      */
     public function process_donation() {
-        header('Content-Type: application/json');
-
         try {
             // Enable error reporting for debugging
             error_reporting(E_ALL);
             ini_set('display_errors', 1);
             
             // Log the raw POST data
-            $this->logger->log('Raw POST data received', 'debug', [
-                'POST' => $_POST,
-                'FILES' => $_FILES
-            ]);
+            $this->logger->log('Raw donation data received', 'debug', $_POST);
 
-            // Verify nonce first
+            // Verify nonce
             if (!check_ajax_referer('wp_donation_system', 'security', false)) {
-                throw new Exception('Security check failed');
+                throw new Exception(__('Security check failed', 'wp-donation-system'));
             }
 
             // Validate required fields
@@ -41,7 +36,7 @@ class WP_Donation_System_Ajax {
             
             foreach ($required_fields as $field) {
                 if (empty($_POST[$field])) {
-                    throw new Exception("Missing required field: {$field}");
+                    throw new Exception(sprintf(__('Missing required field: %s', 'wp-donation-system'), $field));
                 }
                 $donation_data[$field] = $_POST[$field];
             }
@@ -52,84 +47,69 @@ class WP_Donation_System_Ajax {
                 'donor_email' => sanitize_email($_POST['donor_email']),
                 'amount' => floatval($_POST['donation_amount']),
                 'payment_method' => sanitize_text_field($_POST['payment_method']),
-                'donor_phone' => isset($_POST['phone_number']) ? sanitize_text_field($_POST['phone_number']) : '',
+                'donor_phone' => isset($_POST['donor_phone']) ? sanitize_text_field($_POST['donor_phone']) : '',
                 'status' => 'pending',
                 'currency' => 'KES',
                 'metadata' => wp_json_encode([
                     'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
-                    'ip_address' => $this->get_client_ip()
+                    'ip_address' => $this->get_client_ip(),
+                    'anonymous' => !empty($_POST['anonymous_donation'])
                 ])
             ];
 
-            // Log the prepared donation data
+            // Log prepared donation data
             $this->logger->log('Prepared donation data', 'debug', $donation_data);
 
-            // Insert donation
+            // Insert donation record
             $donation_id = $this->database->insert_donation($donation_data);
-
             if (!$donation_id) {
-                throw new Exception('Failed to save donation');
+                throw new Exception(__('Failed to save donation record', 'wp-donation-system'));
             }
 
-            // Log successful insertion
-            $this->logger->log('Donation saved successfully', 'info', [
+            // Add donation ID to data
+            $donation_data['donation_id'] = $donation_id;
+
+            // Get gateway instance
+            $gateway_manager = WP_Donation_System_Gateway_Manager::get_instance();
+            $gateway = $gateway_manager->get_gateway($donation_data['payment_method']);
+            
+            if (!$gateway || !$gateway->is_enabled()) {
+                throw new Exception(sprintf(
+                    __('%s gateway is not available', 'wp-donation-system'),
+                    ucfirst($donation_data['payment_method'])
+                ));
+            }
+
+            // Process payment through gateway
+            $this->logger->log('Processing payment through gateway', 'info', [
+                'gateway' => $donation_data['payment_method'],
                 'donation_id' => $donation_id
             ]);
 
-            // Process payment based on method
-            switch ($donation_data['payment_method']) {
-                case 'mpesa':
-                case 'paypal':
-                    $gateway_manager = WP_Donation_System_Gateway_Manager::get_instance();
-                    $gateway = $gateway_manager->get_gateway($donation_data['payment_method']);
-                    
-                    if (!$gateway || !$gateway->is_enabled()) {
-                        throw new Exception(sprintf(
-                            __('%s gateway is not available', 'wp-donation-system'),
-                            ucfirst($donation_data['payment_method'])
-                        ));
-                    }
-                    
-                    $result = $gateway->process_payment([
-                        'donor_phone' => $donation_data['donor_phone'] ?? '',
-                        'amount' => $donation_data['amount'],
-                        'donation_id' => $donation_id,
-                        'currency' => $donation_data['currency'] ?? 'USD'
-                    ]);
+            $result = $gateway->process_payment($donation_data);
 
-                    if ($result['result'] !== 'success') {
-                        throw new Exception($result['message'] ?? __('Payment processing failed', 'wp-donation-system'));
-                    }
-
-                    // Update donation status
-                    $update_data = ['status' => 'processing'];
-                    if (isset($result['checkout_request_id'])) {
-                        $update_data['checkout_request_id'] = $result['checkout_request_id'];
-                    }
-                    $this->database->update_donation($donation_id, $update_data);
-
-                    // Handle redirect if needed
-                    $response_data = [
-                        'donation_id' => $donation_id,
-                        'payment_method' => $donation_data['payment_method']
-                    ];
-
-                    if (!empty($result['redirect']) && !empty($result['redirect_url'])) {
-                        $response_data['redirect'] = true;
-                        $response_data['redirect_url'] = $result['redirect_url'];
-                    } else {
-                        $response_data['message'] = __('Please complete the payment process.', 'wp-donation-system');
-                    }
-
-                    wp_send_json_success($response_data);
-                    break;
-
-                default:
-                    throw new Exception(__('Invalid payment method', 'wp-donation-system'));
+            // Update donation with gateway response
+            $update_data = ['status' => 'processing'];
+            if (isset($result['checkout_request_id'])) {
+                $update_data['checkout_request_id'] = $result['checkout_request_id'];
             }
+            $this->database->update_donation($donation_id, $update_data);
+
+            // Log success
+            $this->logger->log('Payment processing successful', 'info', [
+                'donation_id' => $donation_id,
+                'result' => $result
+            ]);
+
+            // Return success response
+            wp_send_json_success(array_merge($result, [
+                'donation_id' => $donation_id,
+                'gateway' => $donation_data['payment_method']
+            ]));
 
         } catch (Exception $e) {
-            $this->logger->log('Donation processing error', 'error', [
+            // Log error
+            $this->logger->log('Payment processing error', 'error', [
                 'error_message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -137,6 +117,7 @@ class WP_Donation_System_Ajax {
                 'POST_data' => $_POST
             ]);
 
+            // Return error response
             wp_send_json_error([
                 'message' => $e->getMessage()
             ]);

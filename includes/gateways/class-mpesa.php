@@ -113,12 +113,13 @@ class WP_Donation_System_Gateway_MPesa extends WP_Donation_System_Gateway
     {
         return [
             'donor_phone' => [
-                'type' => 'text',
+                'type' => 'tel',
                 'label' => __('M-Pesa Phone Number', 'wp-donation-system'),
                 'required' => true,
                 'placeholder' => '254XXXXXXXXX',
-                'description' => __('Enter your M-Pesa phone number', 'wp-donation-system'),
-                'value' => $this->settings['donor_phone'] ?? '',
+                'pattern' => '254[0-9]{9}',
+                'maxlength' => 12,
+                'hint' => __('Enter your M-Pesa phone number starting with 254', 'wp-donation-system'),
                 'validation' => '/^254[0-9]{9}$/'
             ]
         ];
