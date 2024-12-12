@@ -1,0 +1,43 @@
+.has-error input,
+.has-error select,
+.has-error textarea {
+    border-color: #d63638 !important;
+}
+
+.error-message {
+    color: #d63638;
+    font-size: 12px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.error-message::before {
+    content: "!";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background: #d63638;
+    color: #fff;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.input-group.has-error label {
+    color: #d63638;
+}
+
+/* Progress steps styling */
+.progress-steps .step.completed {
+    background: #00a32a;
+    color: #fff;
+}
+
+.progress-steps .step.completed .step-circle {
+    background: #fff;
+    color: #00a32a;
+} 
