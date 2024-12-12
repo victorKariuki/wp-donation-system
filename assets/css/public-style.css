@@ -31,10 +31,15 @@
     max-width: 800px;
     margin: 40px auto;
     padding: 0;
-    background: #ffffff;
-    border-radius: 24px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    background: linear-gradient(to bottom, #ffffff, #f8fafc);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
     overflow: hidden;
+    transition: box-shadow 0.3s ease;
+}
+
+.wp-donation-form:hover {
+    box-shadow: 0 6px 32px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 /* Test Mode Notice */
@@ -55,17 +60,17 @@
     z-index: 1;
     display: flex;
     justify-content: space-between;
-    padding: 24px 40px;
-    background: #f8fafc;
+    padding: 32px 40px;
+    background: linear-gradient(to right, #f8fafc, #f1f5f9);
     border-bottom: 1px solid #e2e8f0;
 }
 
 .progress-steps::before {
     content: '';
     position: absolute;
-    top: 50%;
-    left: 80px;
-    right: 80px;
+    top: 41%;
+    left: 138px;
+    right: 150px;
     height: 2px;
     background: #e2e8f0;
     transform: translateY(-50%);
@@ -81,8 +86,8 @@
 }
 
 .step-circle {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     background: #fff;
     border: 2px solid #e2e8f0;
     border-radius: 50%;
@@ -93,6 +98,8 @@
     font-weight: var(--font-semibold);
     color: #64748b;
     transition: all 0.3s ease;
+    font-size: 18px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .step.active .step-circle {
@@ -100,7 +107,8 @@
     border-color: #2563eb;
     color: #ffffff;
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
-    transform: scale(1.1);
+    transform: scale(1.15);
+    box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.15);
 }
 
 .step.completed .step-circle {
@@ -153,14 +161,14 @@
 .amount-presets {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 30px;
+    gap: 16px;
+    margin-bottom: 36px;
 }
 
 .amount-preset {
-    padding: 16px 12px;
+    padding: 20px 16px;
     border: 2px solid #e2e8f0;
-    border-radius: 12px;
+    border-radius: 16px;
     background: #ffffff;
     font-size: var(--text-base);
     font-weight: var(--font-semibold);
@@ -170,33 +178,39 @@
     text-align: center;
     position: relative;
     overflow: hidden;
+    transform-origin: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .amount-preset:hover {
     border-color: #2563eb;
     background: #f8fafc;
-    transform: translateY(-1px);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
 }
 
 .amount-preset.active {
     background: #2563eb;
     border-color: #2563eb;
     color: #ffffff;
+    transform: scale(1.05);
+    box-shadow: 0 8px 16px rgba(37, 99, 235, 0.15);
 }
 
 /* Amount Input */
 .amount-input {
     position: relative;
-    background: #ffffff;
+    background: linear-gradient(to right, #f8fafc, #ffffff);
     border: 2px solid #e2e8f0;
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 4px;
     transition: all 0.2s ease;
 }
 
 .amount-input:focus-within {
     border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+    transform: translateY(-1px);
 }
 
 .currency {
@@ -208,17 +222,20 @@
     font-weight: var(--font-semibold);
     font-size: 15px;
     pointer-events: none;
+    font-size: 20px;
+    color: #2563eb;
 }
 
 input[type="number"]#donation_amount {
-    width: 100%;
-    padding: 12px 12px 12px 40px;
+    padding: 16px 16px 16px 48px;
     border: none;
     background: transparent;
-    font-size: var(--text-lg);
+    font-size: 24px;
     font-weight: var(--font-semibold);
     color: #1e293b;
     text-align: left;
+    width: 87%;
+    transition: all 0.2s ease;
 }
 
 input[type="number"]#donation_amount:focus {
@@ -263,7 +280,7 @@ input[type="number"]#donation_amount:focus {
     display: flex;
     justify-content: space-between;
     gap: 16px;
-    margin-top: 40px;
+    margin-top: 32px;
     padding-top: 24px;
     border-top: 1px solid #e2e8f0;
     opacity: 1;
@@ -329,10 +346,11 @@ input[type="number"]#donation_amount:focus {
     display: none;
     width: 20px;
     height: 20px;
-    border: 2px solid #ffffff;
-    border-right-color: transparent;
+    border: 3px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+    border-top-color: #ffffff;
+    animation: spin 1s linear infinite;
+    margin-left: 8px;
 }
 
 .processing .loading-spinner {
@@ -348,7 +366,12 @@ input[type="number"]#donation_amount:focus {
 .error-message {
     color: #ef4444;
     font-size: var(--text-sm);
-    margin-top: 6px;
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #fef2f2;
+    font-weight: 500;
+    animation: slideIn 0.3s ease;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -381,7 +404,9 @@ input[type="number"]#donation_amount:focus {
 }
 
 @keyframes spin {
-    to { transform: translateY(-50%) rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Accessibility */
@@ -852,4 +877,132 @@ input[type="number"]#donation_amount:focus {
 
 .input-group.anonymous input {
     border-style: dashed;
+}
+
+.bank-transfer-instructions {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.bank-transfer-instructions h3 {
+    color: #1e293b;
+    margin-bottom: 15px;
+}
+
+.bank-details {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.bank-detail-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px;
+}
+
+.bank-detail-label {
+    font-weight: 600;
+    color: #64748b;
+}
+
+.reference-number {
+    font-family: monospace;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #2563eb;
+    background: #eff6ff;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.transfer-note {
+    font-style: italic;
+    color: #64748b;
+    margin-top: 15px;
+    font-size: 0.9em;
+}
+
+/* Payment Methods Error Styling */
+.payment-methods-section.has-error {
+    border: 1px solid #d63638;
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.payment-methods-section .error-message {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: #fcf0f1;
+    border-radius: 4px;
+}
+
+.payment-methods-section.has-error .payment-methods-wrapper {
+    border-color: #d63638;
+}
+
+/* Form Navigation Improvements */
+.form-navigation {
+    display: flex;
+    gap: 16px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.form-navigation button {
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.next-step {
+    background: #2563eb;
+    color: #ffffff;
+    flex: 2;
+}
+
+.next-step:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.prev-step {
+    background: #f1f5f9;
+    color: #475569;
+    flex: 1;
+}
+
+.prev-step:hover {
+    background: #e2e8f0;
+    transform: translateY(-1px);
+}
+
+/* Payment Methods Enhancement */
+.payment-methods-wrapper {
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.payment-method-option {
+    padding: 20px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.payment-method-option:hover {
+    background: #f8fafc;
+    transform: translateY(-1px);
+}
+
+.payment-method-option.active {
+    border-color: #2563eb;
+    background: #eff6ff;
 }

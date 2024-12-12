@@ -38,6 +38,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Payment method selection glitches
 - Step transition animations
 - Error message display
+- Fixed M-Pesa payment initiation error
+- Added better error logging for payment processing
+- Improved validation of phone numbers for M-Pesa payments
+- Enhanced error handling in AJAX processing
+- Fixed missing gateway class error
+- Fixed currency formatting method inconsistency in donations list table
+- Fixed database table name inconsistency in queries
+- Updated all database queries to use correct table prefix
+- Added forced table creation on activation
+- Added admin notice and manual table creation option
+- Improved database table creation error handling
+- Fixed currency formatting in donations list display
+- Updated all currency formatting calls to use correct method
+- Fixed pending donations count display
+- Enhanced donation statistics visualization
+- Added improved styling for donation statistics
+- Fixed integer type casting for donation counts
+- Added debug information display for administrators
+- Improved data verification and display accuracy
+- Enhanced error reporting for database queries
+- Added number formatting for better readability
 
 ## [1.0.0] - 2024-03-01
 

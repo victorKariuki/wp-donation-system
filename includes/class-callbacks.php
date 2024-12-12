@@ -7,7 +7,9 @@ class WP_Donation_System_Callbacks {
     public function __construct() {
         require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
         require_once WP_DONATION_SYSTEM_PATH . 'includes/class-database.php';
-        require_once WP_DONATION_SYSTEM_PATH . 'includes/class-mpesa-transaction.php';
+        require_once WP_DONATION_SYSTEM_PATH . 'includes/database/class-model.php';
+        require_once WP_DONATION_SYSTEM_PATH . 'includes/models/class-mpesa-transaction.php';
+        
         $this->logger = new WP_Donation_System_Logger();
         $this->database = new WP_Donation_System_Database();
         $this->transactions = new WP_Donation_System_MPesa_Transaction();
@@ -76,12 +78,10 @@ class WP_Donation_System_Callbacks {
             'result_desc' => $result_desc
         ]);
 
-        // Find the donation
-        global $wpdb;
-        $donation = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}donations WHERE checkout_request_id = %s",
-            $checkout_request_id
-        ));
+        // Find the donation using ORM
+        $donation = WP_Donation_System_Donation::query()
+            ->where('checkout_request_id', $checkout_request_id)
+            ->first();
 
         if (!$donation) {
             $log_context['error_type'] = 'donation_not_found';
@@ -104,27 +104,12 @@ class WP_Donation_System_Callbacks {
 
             $log_context['payment_details'] = $payment_details;
 
-            // Update donation as completed
-            $update_data = [
-                'status' => 'completed',
-                'transaction_id' => $payment_details['MpesaReceiptNumber'],
-                'notes' => $result_desc,
-                'metadata' => wp_json_encode([
-                    'amount' => $payment_details['Amount'],
-                    'phone' => $payment_details['PhoneNumber'],
-                    'transaction_date' => $payment_details['TransactionDate'],
-                    'merchant_request_id' => $merchant_request_id
-                ])
-            ];
-
-            $updated = $this->database->update_donation($donation->id, $update_data);
+            // Update donation using ORM
+            $updated = $this->handle_successful_payment($donation->id, $payment_details, $merchant_request_id);
             
             if (!$updated) {
                 $log_context['error_type'] = 'update_failed';
-                $this->logger->log('Failed to update donation status', 'error', [
-                    ...$log_context,
-                    'update_data' => $update_data
-                ]);
+                $this->logger->log('Failed to update donation status', 'error', $log_context);
                 return new WP_REST_Response(['ResultCode' => 0], 200);
             }
 
@@ -139,13 +124,11 @@ class WP_Donation_System_Callbacks {
             ]);
 
         } else {
-            // Update donation as failed
-            $update_data = [
-                'status' => 'failed',
-                'notes' => $result_desc
-            ];
-
-            $this->database->update_donation($donation->id, $update_data);
+            // Update donation as failed using ORM
+            $donation->updateStatus(
+                WP_Donation_System_Donation::STATUS_FAILED,
+                ['notes' => $result_desc]
+            );
 
             $log_context['error_type'] = 'payment_failed';
             $this->logger->log('Payment failed', 'error', [
@@ -154,15 +137,76 @@ class WP_Donation_System_Callbacks {
             ]);
         }
 
-        // Update transaction record
-        $this->transactions->update_from_callback(
-            $checkout_request_id,
-            $callback_data
-        );
+        // Update transaction record using ORM
+        $transaction = WP_Donation_System_MPesa_Transaction::query()
+            ->where('checkout_request_id', $checkout_request_id)
+            ->first();
+            
+        if ($transaction) {
+            $transaction->updateFromCallback($callback_data);
+        }
 
         return new WP_REST_Response([
             'ResultCode' => 0,
             'ResultDesc' => 'Callback processed successfully'
         ], 200);
+    }
+
+    protected function handle_successful_payment($donation_id, $payment_details, $merchant_request_id) {
+        $donation = WP_Donation_System_Donation::find($donation_id);
+        if (!$donation) {
+            return false;
+        }
+
+        $metadata = [
+            'amount' => $payment_details['Amount'],
+            'phone' => $payment_details['PhoneNumber'],
+            'transaction_date' => $payment_details['TransactionDate'],
+            'merchant_request_id' => $merchant_request_id
+        ];
+
+        return $donation->updateStatus(
+            WP_Donation_System_Donation::STATUS_COMPLETED,
+            [
+                'transaction_id' => $payment_details['MpesaReceiptNumber'],
+                'notes' => $payment_details['ResultDesc'] ?? '',
+                'metadata' => wp_json_encode($metadata)
+            ]
+        );
+    }
+
+    public function handle_mpesa_callback($request) {
+        $body = $request->get_json_params();
+        if (empty($body)) {
+            return new WP_REST_Response(['error' => 'Invalid request'], 400);
+        }
+
+        $request_id = $body['CheckoutRequestID'] ?? null;
+        $status = $body['ResultDesc'] ?? null;
+        $result_code = $body['ResultCode'] ?? null;
+        $result_desc = $body['ResultDesc'] ?? null;
+
+        if (!$request_id || !$status || !$result_code || !$result_desc) {
+            return new WP_REST_Response(['error' => 'Missing required fields'], 400);
+        }
+
+        $transaction = WP_Donation_System_MPesa_Transaction::query()
+            ->where('checkout_request_id', $request_id)
+            ->first();
+            
+        if ($transaction) {
+            $transaction->update([
+                'request_status' => $status,
+                'result_code' => $result_code,
+                'result_desc' => $result_desc
+            ]);
+            
+            $donation = WP_Donation_System_Donation::find($transaction->donation_id);
+            if ($donation) {
+                $donation->update(['status' => $status]);
+            }
+        }
+
+        return new WP_REST_Response(['success' => true], 200);
     }
 } 

@@ -6,7 +6,7 @@ if (!defined('ABSPATH')) {
 // Get donation details
 global $wpdb;
 $donation = $wpdb->get_row($wpdb->prepare(
-    "SELECT * FROM {$wpdb->prefix}donations WHERE id = %d",
+    "SELECT * FROM {$wpdb->prefix}donation_system_donations WHERE id = %d",
     $donation_id
 ));
 
@@ -73,7 +73,7 @@ $currency = new WP_Donation_System_Currency();
                 <div class="detail-row">
                     <span class="detail-label"><?php _e('Amount:', 'wp-donation-system'); ?></span>
                     <span class="detail-value amount">
-                        <?php echo esc_html($currency->format_amount($donation->amount, $donation->currency)); ?>
+                        <?php echo esc_html($currency->format($donation->amount, $donation->currency)); ?>
                     </span>
                 </div>
                 <div class="detail-row">

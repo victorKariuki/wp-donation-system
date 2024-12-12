@@ -1,3 +1,5 @@
+<?php if (!defined('ABSPATH')) exit; ?>
+
 <div class="wp-donation-form">
     <?php if (get_option('wp_donation_test_mode', false)): ?>
         <div class="test-mode-notice">
@@ -43,14 +45,24 @@
                     <label for="donation_amount"><?php _e('Custom Amount', 'wp-donation-system'); ?></label>
                     <div class="amount-input">
                         <span class="currency">KSh</span>
+                        <?php
+                        $settings_manager = WP_Donation_System_Settings_Manager::get_instance();
+                        $minimum_donation = floatval($settings_manager->get_setting('donation_minimum', 'general', '10'));
+                        $max_amount = floatval($settings_manager->get_setting("donation_maximum",'general', '10000'));
+                        $min_amount = $minimum_donation;
+                        ?>
                         <input type="number" 
-                            id="donation_amount" 
-                            name="donation_amount" 
-                            min="<?php echo esc_attr($min_amount); ?>" 
-                            max="<?php echo esc_attr($max_amount); ?>" 
-                            step="1" 
-                            required
-                            placeholder="Enter amount">
+                               id="donation_amount" 
+                               name="donation_amount" 
+                               min="<?php echo esc_attr($min_amount); ?>" 
+                               max="<?php echo esc_attr($max_amount); ?>" 
+                               step="1" 
+                               required="required"
+                               value=""
+                               aria-required="true"
+                               aria-label="<?php esc_attr_e('Donation Amount', 'wp-donation-system'); ?>"
+                               placeholder="<?php esc_attr_e('Enter amount', 'wp-donation-system'); ?>"
+                               class="donation-amount-input">
                     </div>
                     <div class="amount-hint">
                         <?php printf(
@@ -83,7 +95,7 @@
                     <input type="text" 
                         id="donor_name" 
                         name="donor_name" 
-                        required
+                        data-required="true"
                         autocomplete="name">
                 </div>
 
@@ -95,7 +107,7 @@
                     <input type="email" 
                         id="donor_email" 
                         name="donor_email" 
-                        required
+                        data-required="true"
                         autocomplete="email">
                     <div class="input-hint">
                         <?php _e('Your donation receipt will be sent to this email.', 'wp-donation-system'); ?>
@@ -210,11 +222,56 @@
     </form>
 </div>
 
-<script>
-console.log(' Donation Form Template Loaded');
-if (typeof jQuery === 'undefined') {
-    console.error('❌ jQuery not loaded!');
-} else {
-    console.log('✅ jQuery version:', jQuery.fn.jquery);
+<style>
+.anonymous-input input {
+    background-color: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+    border-style: dashed !important;
 }
-</script>
+
+.anonymous-input input::placeholder {
+    color: #64748b !important;
+    opacity: 1 !important;
+}
+
+.anonymous-input::after {
+    content: '(Anonymous)';
+    display: inline-block;
+    font-size: 12px;
+    color: #64748b;
+    margin-left: 8px;
+    font-style: italic;
+}
+
+.donation-amount-input {
+    width: 87%;
+    height: 40px;
+    padding: 8px 12px 8px 45px; /* Added left padding for currency symbol */
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #2c3338;
+    background: #fff;
+    position: relative;
+    z-index: 1;
+}
+
+.donation-amount-input:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+.amount-input {
+    position: relative;
+}
+
+.amount-input .currency {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+</style>

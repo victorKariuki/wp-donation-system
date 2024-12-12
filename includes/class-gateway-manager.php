@@ -12,6 +12,10 @@ class WP_Donation_System_Gateway_Manager {
 
     private function __construct() {
         add_action('init', array($this, 'init_gateways'), 5);
+        // Register available gateways
+        $this->register_gateway('WP_Donation_System_Gateway_MPesa');
+        $this->register_gateway('WP_Donation_System_Gateway_PayPal');
+        $this->register_gateway('WP_Donation_System_Gateway_Bank_Transfer');
     }
 
     public function init_gateways() {

@@ -144,4 +144,9 @@ class WP_Donation_System_Settings_Manager {
     public function save_settings($group_id, $settings) {
         return update_option('wp_donation_system_' . $group_id . '_settings', $settings);
     }
+
+    public function get_setting($key, $group, $default = '') {
+        $settings = $this->get_settings($group);
+        return isset($settings[$key]) ? $settings[$key] : $default;
+    }
 } 

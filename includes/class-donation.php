@@ -9,7 +9,7 @@ class WP_Donation_System_Donation {
         global $wpdb;
         
         $old_status = $wpdb->get_var($wpdb->prepare(
-            "SELECT status FROM {$wpdb->prefix}donations WHERE id = %d",
+            "SELECT status FROM {$wpdb->prefix}donation_system_donations WHERE id = %d",
             $donation_id
         ));
         
@@ -18,8 +18,11 @@ class WP_Donation_System_Donation {
         }
         
         $wpdb->update(
-            $wpdb->prefix . 'donations',
-            array('status' => $new_status),
+            $wpdb->prefix . 'donation_system_donations',
+            array(
+                'status' => $new_status,
+                'completed_at' => $new_status === 'completed' ? current_time('mysql') : null
+            ),
             array('id' => $donation_id)
         );
         

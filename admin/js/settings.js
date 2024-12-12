@@ -3,6 +3,9 @@ jQuery(document).ready(function($) {
         init: function() {
             this.bindEvents();
             this.initializeActiveTab();
+            
+            // Add this to ensure proper initial state
+            this.handleUrlParams();
         },
 
         bindEvents: function() {
@@ -12,39 +15,50 @@ jQuery(document).ready(function($) {
             window.addEventListener('popstate', this.handlePopState.bind(this));
         },
 
-        initializeActiveTab: function() {
+        handleUrlParams: function() {
             const urlParams = new URLSearchParams(window.location.search);
             const tab = urlParams.get('tab') || 'general';
-            this.activateTab(tab);
+            this.activateTab(tab, false); // false means don't push state
+        },
+
+        initializeActiveTab: function() {
+            // Show the first tab by default if no tab is specified
+            if (!window.location.search.includes('tab=')) {
+                this.activateTab('general', false);
+            }
         },
 
         handleTabClick: function(e) {
             e.preventDefault();
-            const tab = $(this).attr('href').split('tab=')[1];
-            Settings.activateTab(tab);
-            
-            // Update URL without reload
-            const newUrl = new URL(window.location);
-            newUrl.searchParams.set('tab', tab);
-            history.pushState({tab: tab}, '', newUrl);
+            const tab = $(this).data('tab'); // Changed to use data attribute
+            Settings.activateTab(tab, true); // true means push state
         },
 
         handlePopState: function(event) {
             const urlParams = new URLSearchParams(window.location.search);
             const tab = urlParams.get('tab') || 'general';
-            this.activateTab(tab);
+            this.activateTab(tab, false);
         },
 
-        activateTab: function(tab) {
+        activateTab: function(tab, pushState) {
             // Update tab navigation
-            $('.nav-tab').removeClass('nav-tab-active')
-                .filter('[href*="tab=' + tab + '"]')
-                .addClass('nav-tab-active');
+            $('.nav-tab').removeClass('nav-tab-active');
+            $(`.nav-tab[data-tab="${tab}"]`).addClass('nav-tab-active');
 
-            // Update content visibility
-            $('.settings-group').hide()
-                .filter('.' + tab)
-                .show();
+            // Update content visibility with smooth transition
+            $('.settings-group').fadeOut(200).promise().done(function() {
+                $(`.settings-group.${tab}`).fadeIn(200);
+            });
+
+            // Update URL if needed
+            if (pushState) {
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('tab', tab);
+                history.pushState({tab: tab}, '', newUrl);
+            }
+
+            // Trigger custom event for other scripts
+            $(document).trigger('settings-tab-changed', [tab]);
         },
 
         handleFormSubmit: function(e) {

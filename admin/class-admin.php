@@ -24,10 +24,15 @@ class WP_Donation_System_Admin {
      */
     private $settings;
 
+    private $logger;
+
     /**
      * Initialize the admin class
      */
     public function __construct() {
+        require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
+        $this->logger = new WP_Donation_System_Logger();
+        
         // Define hardcoded defaults
         $this->default_settings = array(
             'mpesa_consumer_key' => '',
@@ -89,6 +94,10 @@ class WP_Donation_System_Admin {
         add_action('wp_ajax_save_settings', array($this, 'handle_save_settings'));
         add_action('wp_ajax_reset_settings', array($this, 'handle_reset_settings'));
         add_action('wp_ajax_toggle_gateway', array($this, 'handle_toggle_gateway'));
+
+        // Add debug AJAX handlers
+        add_action('wp_ajax_get_debug_logs', array($this, 'ajax_get_debug_logs'));
+        add_action('wp_ajax_clear_debug_logs', array($this, 'ajax_clear_debug_logs'));
     }
 
     /**
@@ -131,6 +140,25 @@ class WP_Donation_System_Admin {
      * Save plugin settings
      */
     private function save_settings() {
+        // Verify general settings nonce
+        if (!isset($_POST['general_settings_nonce']) || 
+            !wp_verify_nonce($_POST['general_settings_nonce'], 'wp_donation_system_settings')
+        ) {
+            return;
+        }
+
+        // Verify gateway settings nonce
+        $gateway_id = $_POST['gateway_id'] ?? '';
+        if ($gateway_id && 
+            (!isset($_POST['gateway_settings_nonce_' . $gateway_id]) || 
+            !wp_verify_nonce(
+                $_POST['gateway_settings_nonce_' . $gateway_id], 
+                'wp_donation_system_gateway_settings'
+            ))
+        ) {
+            return;
+        }
+
         if (!current_user_can('manage_options')) {
             return;
         }
@@ -191,17 +219,7 @@ class WP_Donation_System_Admin {
             'manage_options',
             'wp-donation-system',
             array($this, 'display_donations_page'),
-            'dashicons-heart',
-            30
-        );
-
-        add_submenu_page(
-            'wp-donation-system',
-            __('All Donations', 'wp-donation-system'),
-            __('All Donations', 'wp-donation-system'),
-            'manage_options',
-            'wp-donation-system',
-            array($this, 'display_donations_page')
+            'dashicons-money-alt'
         );
 
         add_submenu_page(
@@ -254,6 +272,7 @@ class WP_Donation_System_Admin {
         }
         
         $settings = $this->get_settings();
+        $logger = $this->logger;
         include WP_DONATION_SYSTEM_PATH . 'admin/views/settings.php';
     }
 
@@ -664,11 +683,9 @@ class WP_Donation_System_Admin {
                 throw new Exception(__('Test transaction not found or expired', 'wp-donation-system'));
             }
 
-            global $wpdb;
-            $donation = $wpdb->get_row($wpdb->prepare(
-                "SELECT id, status, notes, transaction_id, metadata FROM {$wpdb->prefix}donations WHERE checkout_request_id = %s",
-                $checkout_request_id
-            ));
+            $donation = WP_Donation_System_Donation::query()
+                ->where('checkout_request_id', $checkout_request_id)
+                ->first();
 
             if (!$donation) {
                 wp_send_json_success(['status' => 'pending']);
@@ -935,5 +952,50 @@ class WP_Donation_System_Admin {
         wp_send_json_success(array(
             'message' => __('Gateway status updated successfully.', 'wp-donation-system')
         ));
+    }
+
+    public function get_donation_stats() {
+        $stats = [
+            'total' => WP_Donation_System_Donation::query()->count(),
+            'completed' => WP_Donation_System_Donation::completed()->count(),
+            'pending' => WP_Donation_System_Donation::pending()->count(),
+            'total_amount' => WP_Donation_System_Donation::completed()
+                ->sum('amount'),
+            'monthly_amount' => WP_Donation_System_Donation::completed()
+                ->where('created_at', '>=', date('Y-m-01'))
+                ->sum('amount')
+        ];
+        
+        return $stats;
+    }
+
+    public function ajax_get_debug_logs() {
+        check_ajax_referer('wp_donation_system_admin', 'security');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Permission denied', 'wp-donation-system')]);
+        }
+        
+        $logger = new WP_Donation_System_Logger();
+        $logs = $logger->get_logs($_POST);
+        
+        wp_send_json_success($logs);
+    }
+
+    public function ajax_clear_debug_logs() {
+        check_ajax_referer('wp_donation_system_admin', 'security');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Permission denied', 'wp-donation-system')]);
+        }
+        
+        $logger = new WP_Donation_System_Logger();
+        $result = $logger->clear_logs();
+        
+        if ($result !== false) {
+            wp_send_json_success(['message' => __('Logs cleared successfully', 'wp-donation-system')]);
+        } else {
+            wp_send_json_error(['message' => __('Failed to clear logs', 'wp-donation-system')]);
+        }
     }
 }

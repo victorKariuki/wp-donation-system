@@ -1,183 +1,197 @@
 <?php
 class WP_Donation_System_Logger {
-    private $table_name;
-    
+    private $log_file;
+    private $debug_mode;
+    private $log_table;
+    private $log_dir;
+
     public function __construct() {
         global $wpdb;
-        $this->table_name = $wpdb->prefix . 'donation_logs';
-        $this->ensure_table_exists();
-    }
-    
-    /**
-     * Create logs table if it doesn't exist
-     */
-    private function ensure_table_exists() {
-        global $wpdb;
-        $charset_collate = $wpdb->get_charset_collate();
-
-        $sql = "CREATE TABLE IF NOT EXISTS {$this->table_name} (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            timestamp datetime DEFAULT CURRENT_TIMESTAMP,
-            level varchar(20) NOT NULL DEFAULT 'info',
-            message text NOT NULL,
-            context longtext,
-            PRIMARY KEY  (id),
-            KEY level (level),
-            KEY timestamp (timestamp)
-        ) $charset_collate;";
-
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
-    }
-    
-    /**
-     * Log a message
-     *
-     * @param mixed $message Message to log
-     * @param string $level Log level (info, error, warning, debug)
-     * @param array $context Additional context data
-     */
-    public function log($message, $level = 'info', $context = array()) {
-        global $wpdb;
+        $this->debug_mode = get_option('wp_donation_system_debug_mode', false);
+        $this->log_dir = WP_DONATION_SYSTEM_PATH . 'logs';
+        $this->log_file = $this->log_dir . '/donation-system.log';
+        $this->log_table = $wpdb->prefix . 'donation_system_logs';
         
-        try {
-            // Convert message to string if needed
-            if (!is_string($message)) {
-                $message = print_r($message, true);
+        // Create logs directory with proper permissions if it doesn't exist
+        $this->ensure_log_directory();
+    }
+
+    private function ensure_log_directory() {
+        // If directory doesn't exist, try to create it
+        if (!file_exists($this->log_dir)) {
+            // Try to create directory with full permissions
+            if (!@mkdir($this->log_dir, 0777, true)) {
+                // If creation fails, log to WordPress error log
+                error_log('WP Donation System: Failed to create logs directory at ' . $this->log_dir);
+                return false;
             }
-            
-            // Insert log entry
-            $result = $wpdb->insert(
-                $this->table_name,
-                array(
-                    'timestamp' => current_time('mysql'),
-                    'level' => $level,
-                    'message' => $message,
-                    'context' => !empty($context) ? wp_json_encode($context) : null
-                ),
-                array(
-                    '%s', // timestamp
-                    '%s', // level
-                    '%s', // message
-                    '%s'  // context
-                )
+            // Set proper permissions after creation
+            @chmod($this->log_dir, 0777);
+        }
+
+        // If file doesn't exist, try to create it
+        if (!file_exists($this->log_file)) {
+            // Try to create file with full permissions
+            if (!@touch($this->log_file)) {
+                error_log('WP Donation System: Failed to create log file at ' . $this->log_file);
+                return false;
+            }
+            // Set proper permissions after creation
+            @chmod($this->log_file, 0666);
+        }
+
+        // Verify directory is writable
+        if (!is_writable($this->log_dir)) {
+            error_log('WP Donation System: Logs directory is not writable: ' . $this->log_dir);
+            return false;
+        }
+
+        // Verify file is writable
+        if (!is_writable($this->log_file)) {
+            error_log('WP Donation System: Log file is not writable: ' . $this->log_file);
+            return false;
+        }
+
+        return true;
+    }
+
+    public function log($message, $level = 'info', $context = []) {
+        if (!$this->debug_mode && $level === 'debug') {
+            return;
+        }
+
+        $timestamp = current_time('mysql');
+        $formatted_context = $context ? json_encode($context, JSON_PRETTY_PRINT) : '';
+        
+        // Try to log to file
+        if ($this->ensure_log_directory()) {
+            $log_entry = sprintf(
+                "[%s] %s: %s %s\n",
+                $timestamp,
+                strtoupper($level),
+                $message,
+                $formatted_context
             );
             
-            if ($result === false) {
-                error_log('Failed to write to log table: ' . $wpdb->last_error);
-            }
-            
-        } catch (Exception $e) {
-            error_log('Logging error: ' . $e->getMessage());
+            // Use file_put_contents with LOCK_EX for atomic writes
+            @file_put_contents($this->log_file, $log_entry, FILE_APPEND | LOCK_EX);
+        }
+
+        // Always log to database as backup
+        $this->log_to_db($message, $level, $context, $timestamp);
+
+        // Also log to WordPress debug log if enabled
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log(sprintf(
+                '[WP Donation System] %s: %s %s',
+                strtoupper($level),
+                $message,
+                $formatted_context
+            ));
         }
     }
-    
-    /**
-     * Get logs with optional filtering
-     *
-     * @param array $args Query arguments
-     * @return array Log entries
-     */
-    public function get_logs($args = array(), $paginate = false) {
+
+    private function log_to_db($message, $level, $context, $timestamp) {
         global $wpdb;
         
+        $wpdb->insert(
+            $this->log_table,
+            array(
+                'timestamp' => $timestamp,
+                'level' => $level,
+                'message' => $message,
+                'context' => is_array($context) ? json_encode($context) : $context
+            ),
+            array('%s', '%s', '%s', '%s')
+        );
+    }
+
+    /**
+     * Get logs with optional filtering
+     */
+    public function get_logs($args = array()) {
+        global $wpdb;
+
         $defaults = array(
             'level' => '',
-            'start_date' => '',
-            'end_date' => '',
+            'date_from' => '',
+            'date_to' => '',
             'per_page' => 20,
             'page' => 1,
             'orderby' => 'timestamp',
             'order' => 'DESC'
         );
-        
+
         $args = wp_parse_args($args, $defaults);
-        $where = array('1=1');
-        $values = array();
         
+        // Start building query
+        $query = "SELECT * FROM {$this->log_table} WHERE 1=1";
+        $query_args = array();
+
+        // Add filters
         if (!empty($args['level'])) {
-            $where[] = 'level = %s';
-            $values[] = $args['level'];
+            $query .= " AND level = %s";
+            $query_args[] = $args['level'];
         }
-        
-        if (!empty($args['start_date'])) {
-            $where[] = 'timestamp >= %s';
-            $values[] = $args['start_date'];
+
+        if (!empty($args['date_from'])) {
+            $query .= " AND timestamp >= %s";
+            $query_args[] = $args['date_from'];
         }
-        
-        if (!empty($args['end_date'])) {
-            $where[] = 'timestamp <= %s';
-            $values[] = $args['end_date'] . ' 23:59:59';
+
+        if (!empty($args['date_to'])) {
+            $query .= " AND timestamp <= %s";
+            $query_args[] = $args['date_to'] . ' 23:59:59';
         }
+
+        // Add ordering
+        $allowed_columns = array('timestamp', 'level', 'message');
+        $orderby = in_array($args['orderby'], $allowed_columns) ? $args['orderby'] : 'timestamp';
+        $order = strtoupper($args['order']) === 'ASC' ? 'ASC' : 'DESC';
         
-        // Count total records for pagination
-        if (!empty($values)) {
-            $total = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->table_name} WHERE " . implode(' AND ', $where),
-                $values
-            ));
-        } else {
-            $total = $wpdb->get_var("SELECT COUNT(*) FROM {$this->table_name} WHERE 1=1");
-        }
-        
-        // Calculate pagination
+        $query .= " ORDER BY {$orderby} {$order}";
+
+        // Add pagination
         $offset = ($args['page'] - 1) * $args['per_page'];
-        $total_pages = ceil($total / $args['per_page']);
-        
-        $orderby = sanitize_sql_orderby($args['orderby'] . ' ' . $args['order']);
-        $base_query = "SELECT * FROM {$this->table_name} WHERE " . implode(' AND ', $where);
-        
-        if ($paginate) {
-            if (!empty($values)) {
-                $query = $wpdb->prepare(
-                    $base_query . " ORDER BY {$orderby} LIMIT %d OFFSET %d",
-                    array_merge($values, array($args['per_page'], $offset))
-                );
-            } else {
-                $query = $wpdb->prepare(
-                    "SELECT * FROM {$this->table_name} WHERE 1=1 ORDER BY {$orderby} LIMIT %d OFFSET %d",
-                    array($args['per_page'], $offset)
-                );
-            }
-        } else {
-            if (!empty($values)) {
-                $query = $wpdb->prepare($base_query . " ORDER BY {$orderby}", $values);
-            } else {
-                $query = "SELECT * FROM {$this->table_name} WHERE 1=1 ORDER BY {$orderby}";
-            }
+        $query .= " LIMIT %d OFFSET %d";
+        $query_args[] = $args['per_page'];
+        $query_args[] = $offset;
+
+        // Prepare and execute query
+        if (!empty($query_args)) {
+            $query = $wpdb->prepare($query, $query_args);
         }
-        
-        $logs = $wpdb->get_results($query);
-        
-        if ($paginate) {
-            return array(
-                'logs' => $logs,
-                'total' => $total,
-                'total_pages' => $total_pages,
-                'current_page' => $args['page'],
-                'per_page' => $args['per_page']
-            );
+
+        $results = $wpdb->get_results($query);
+
+        // Get total count for pagination
+        $total_query = "SELECT COUNT(*) FROM {$this->log_table} WHERE 1=1";
+        if (!empty($args['level'])) {
+            $total_query = $wpdb->prepare($total_query . " AND level = %s", $args['level']);
         }
-        
-        return $logs;
+        $total = $wpdb->get_var($total_query);
+
+        return array(
+            'logs' => $results,
+            'total' => (int)$total,
+            'pages' => ceil($total / $args['per_page'])
+        );
     }
-    
+
     /**
-     * Clear logs
-     *
-     * @param int $days_old Delete logs older than X days (0 for all)
+     * Clear logs based on age
      */
     public function clear_logs($days_old = 0) {
         global $wpdb;
         
         if ($days_old > 0) {
-            $date = date('Y-m-d H:i:s', strtotime("-{$days_old} days"));
-            $wpdb->query($wpdb->prepare(
-                "DELETE FROM {$this->table_name} WHERE timestamp < %s",
-                $date
+            $cutoff_date = date('Y-m-d H:i:s', strtotime("-{$days_old} days"));
+            return $wpdb->query($wpdb->prepare(
+                "DELETE FROM {$this->log_table} WHERE timestamp <= %s",
+                $cutoff_date
             ));
-        } else {
-            $wpdb->query("TRUNCATE TABLE {$this->table_name}");
         }
+        
+        return $wpdb->query("TRUNCATE TABLE {$this->log_table}");
     }
 } 

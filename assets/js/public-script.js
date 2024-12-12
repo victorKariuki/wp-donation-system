@@ -1,8 +1,22 @@
 jQuery(document).ready(function($) {
+    // Check for required dependencies
+    if (typeof wpDonationSystem === 'undefined') {
+        console.error('Required wpDonationSystem object not found');
+        return;
+    }
+
     const DonationForm = {
         init: function() {
             this.bindEvents();
             this.initializeForm();
+            
+            // Add step validation
+            $('.next-step').on('click', function() {
+                const currentStep = $(this).closest('.form-step').data('step');
+                if (DonationForm.validateStep(currentStep)) {
+                    DonationForm.goToStep(currentStep + 1);
+                }
+            });
         },
 
         bindEvents: function() {
@@ -18,8 +32,8 @@ jQuery(document).ready(function($) {
             $('.gateway-field').on('input change', this.handleGatewayFieldInput);
             
             // Add real-time validation for donor fields
-            $('#donor_name, #donor_email').on('input', function() {
-                DonationForm.validateDonorDetails();
+            $('#donor_name, #donor_email').on('input', () => {
+                this.validateDonorDetails();
             });
             
             // Update summary on donor info change
@@ -28,9 +42,10 @@ jQuery(document).ready(function($) {
             });
             
             // Handle anonymous donation toggle
-            $('#anonymous_donation').on('change', function() {
-                DonationForm.handleAnonymousToggle();
-                DonationForm.validateDonorDetails(); // Revalidate after toggle
+            $('#anonymous_donation').on('change', () => {
+                this.handleAnonymousToggle();
+                this.validateDonorDetails();
+                this.updateSummary();
             });
             
             // Add phone number formatting
@@ -134,75 +149,81 @@ jQuery(document).ready(function($) {
         },
 
         formatCurrency: function(amount) {
-            const currencyCode = wpDonationSystem.currency.code;
-            const currencyData = wpDonationSystem.currency.data;
-            
+            // Default currency settings if not provided
+            const currency = wpDonationSystem.currency || {
+                code: 'KES',
+                symbol: 'KSh',
+                position: 'left',
+                decimals: 2,
+                decimal_separator: '.',
+                thousand_separator: ','
+            };
+
             // Format number
-            const formatted = new Intl.NumberFormat(undefined, {
-                minimumFractionDigits: currencyData.decimals,
-                maximumFractionDigits: currencyData.decimals,
-                useGrouping: true
-            }).format(amount);
+            let formattedAmount = parseFloat(amount).toFixed(currency.decimals);
             
-            // Add currency symbol
-            return currencyData.position === 'left' 
-                ? currencyData.symbol + formatted 
-                : formatted + currencyData.symbol;
+            // Add thousand separators
+            formattedAmount = formattedAmount.replace(/\B(?=(\d{3})+(?!\d))/g, currency.thousand_separator);
+            
+            // Replace decimal point if needed
+            if (currency.decimal_separator !== '.') {
+                formattedAmount = formattedAmount.replace('.', currency.decimal_separator);
+            }
+            
+            // Add currency symbol in correct position
+            if (currency.position === 'left') {
+                return currency.symbol + ' ' + formattedAmount;
+            } else if (currency.position === 'right') {
+                return formattedAmount + ' ' + currency.symbol;
+            } else if (currency.position === 'left_space') {
+                return currency.symbol + ' ' + formattedAmount;
+            } else if (currency.position === 'right_space') {
+                return formattedAmount + ' ' + currency.symbol;
+            }
+            
+            // Default to left position
+            return currency.symbol + ' ' + formattedAmount;
         },
 
         validateStep: function(step) {
-            let isValid = true;
-            
-            // Clear previous errors
             this.clearErrors();
+            let isValid = true;
             
             switch(step) {
                 case 1: // Amount step
                     isValid = this.validateAmountStep();
                     break;
                 case 2: // Donor details step
-                    isValid = this.validateDonorDetails();
+                    isValid = this.validateDonorStep();
                     break;
                 case 3: // Payment step
                     isValid = this.validatePaymentStep();
                     break;
             }
             
-            // Update button states
-            const $currentStep = $('.form-step[data-step="' + step + '"]');
-            const $nextButton = $currentStep.find('.next-step');
-            const $submitButton = $currentStep.find('.submit-donation');
-            
-            if ($nextButton.length) {
-                $nextButton.prop('disabled', !isValid);
-            }
-            if ($submitButton.length) {
-                $submitButton.prop('disabled', !isValid);
-            }
-            
             return isValid;
         },
 
-        clearErrors: function() {
-            $('.has-error').removeClass('has-error');
-            $('.error-message').remove();
-        },
-
         validateAmountStep: function() {
-            const amount = parseFloat($('#donation_amount').val()) || 0;
-            const minAmount = parseFloat($('#min_amount').val()) || 5;
-            const maxAmount = parseFloat($('#max_amount').val()) || 10000;
+            const amount = parseFloat($('#donation_amount').val());
+            const minAmount = parseFloat($('#donation_amount').attr('min'));
+            const maxAmount = parseFloat($('#donation_amount').attr('max'));
             
-            if (amount <= 0) {
-                this.showFieldError('donation_amount', wpDonationSystem.strings.invalid_amount);
+            if (!amount || isNaN(amount)) {
+                this.showError('donation_amount', wpDonationSystem.strings.invalid_amount);
                 return false;
             }
             
-            if (amount < minAmount || amount > maxAmount) {
-                this.showFieldError('donation_amount', 
-                    wpDonationSystem.strings.amount_range
-                        .replace('{min}', this.formatCurrency(minAmount))
-                        .replace('{max}', this.formatCurrency(maxAmount))
+            if (amount < minAmount) {
+                this.showError('donation_amount', 
+                    wpDonationSystem.strings.minimum_amount.replace('%s', this.formatCurrency(minAmount))
+                );
+                return false;
+            }
+            
+            if (amount > maxAmount) {
+                this.showError('donation_amount', 
+                    wpDonationSystem.strings.maximum_amount.replace('%s', this.formatCurrency(maxAmount))
                 );
                 return false;
             }
@@ -210,49 +231,40 @@ jQuery(document).ready(function($) {
             return true;
         },
 
-        validatePaymentStep: function() {
-            const $selectedGateway = $('input[name="payment_method"]:checked');
-            if (!$selectedGateway.length) {
-                this.showError(wpDonationSystem.strings.select_payment);
-                return false;
-            }
+        validateDonorStep: function() {
+            let isValid = true;
+            const isAnonymous = $('#anonymous_donation').is(':checked');
             
-            // Check if it's M-Pesa and validate phone number
-            if ($selectedGateway.val() === 'mpesa') {
-                const $phoneField = $('#donor_phone');
-                if (!$phoneField.length || !$phoneField.val().trim()) {
-                    this.showError(wpDonationSystem.strings.invalid_phone);
-                    return false;
+            if (!isAnonymous) {
+                const name = $('#donor_name').val().trim();
+                const email = $('#donor_email').val().trim();
+                
+                if (!name) {
+                    this.showError('donor_name', wpDonationSystem.strings.name_required);
+                    isValid = false;
                 }
                 
-                // Validate phone number format (254XXXXXXXXX)
-                const phoneNumber = $phoneField.val().trim();
-                if (!/^254[0-9]{9}$/.test(phoneNumber)) {
-                    this.showError(wpDonationSystem.strings.invalid_phone);
-                    return false;
-                }
-            }
-            
-            // Check gateway-specific fields
-            const $fields = $('.payment-fields:visible .gateway-field[required]');
-            if ($fields.length === 0) {
-                return true; // No required fields, payment method is valid
-            }
-            
-            // Validate all required fields
-            let isValid = true;
-            $fields.each(function() {
-                if (!$(this).val().trim()) {
+                if (!email) {
+                    this.showError('donor_email', wpDonationSystem.strings.email_required);
                     isValid = false;
-                    return false; // Break the loop
+                } else if (!this.isValidEmail(email)) {
+                    this.showError('donor_email', wpDonationSystem.strings.invalid_email);
+                    isValid = false;
                 }
-            });
-            
-            if (!isValid) {
-                this.showError(wpDonationSystem.strings.complete_required_fields);
             }
             
             return isValid;
+        },
+
+        validatePaymentStep: function() {
+            const $paymentMethods = $('input[name="payment_method"]');
+            
+            if (!$paymentMethods.filter(':checked').length) {
+                this.showError('payment-method', wpDonationSystem.strings.select_payment);
+                return false;
+            }
+            
+            return true;
         },
 
         prevStep: function() {
@@ -317,42 +329,31 @@ jQuery(document).ready(function($) {
 
         handleSubmit: function(e) {
             e.preventDefault();
-            console.log(' Starting donation submission...');
+            console.log('Starting donation submission...');
             
             const self = DonationForm;
             const $form = $(this);
             const $submitButton = $form.find('.submit-donation');
             
-            // Basic validation
-            if (!$('input[name="payment_method"]:checked').length) {
-                console.warn('❌ No payment method selected');
-                self.showError(wpDonationSystem.strings.select_payment);
-                return;
-            }
-            
             // Show processing state
-            console.log('⏳ Setting processing state...');
             self.setProcessingState($submitButton, true);
-            
-            // Get selected payment method
-            const selectedMethod = $('input[name="payment_method"]:checked').val();
             
             // Prepare form data
             const formData = new FormData($form[0]);
+            
+            // Handle anonymous donation
+            const isAnonymous = $('#anonymous_donation').is(':checked');
+            if (isAnonymous) {
+                formData.set('donor_name', 'Anonymous Guest');
+                formData.set('donor_email', 'anonymous@' + window.location.hostname);
+                formData.set('is_anonymous', '1');
+            }
+            
+            // Add required action and nonce
             formData.append('action', 'process_donation');
             formData.append('security', wpDonationSystem.nonce);
             
-            // Get all visible gateway fields for the selected payment method
-            const $selectedGateway = $(`#payment_${selectedMethod}`).closest('.payment-option');
-            const $gatewayFields = $selectedGateway.find('.gateway-field:visible');
-            
-            // Add gateway fields to form data
-            $gatewayFields.each(function() {
-                const $field = $(this);
-                formData.append($field.attr('name'), $field.val());
-            });
-            
-            // Log form data
+            // Log form data for debugging
             const formDataObj = {};
             for (let [key, value] of formData.entries()) {
                 formDataObj[key] = value;
@@ -371,7 +372,7 @@ jQuery(document).ready(function($) {
                     
                     if (!response.success) {
                         console.error('❌ Payment failed:', response.data.message);
-                        self.handleError(response.data.message);
+                        self.showError('payment-error', response.data.message);
                         return;
                     }
                     
@@ -381,17 +382,17 @@ jQuery(document).ready(function($) {
                             console.log('🎉 Payment completed! Redirecting...');
                             window.location.href = response.data.redirect_url;
                             break;
-                            
+                                
                         case 'pending':
                             if (response.data.gateway === 'mpesa') {
                                 console.log('📱 Starting M-Pesa payment flow...');
                                 self.handleMpesaPayment(response.data);
                             }
                             break;
-                            
+                                
                         case 'failed':
                             console.error('❌ Payment failed:', response.data.message);
-                            self.handleError(response.data.message);
+                            self.showError('payment-error', response.data.message);
                             break;
                     }
                 },
@@ -401,12 +402,12 @@ jQuery(document).ready(function($) {
                         error: error,
                         response: xhr.responseText
                     });
-                    self.handleError(wpDonationSystem.strings.network_error);
+                    self.showError('network-error', wpDonationSystem.strings.network_error);
+                },
+                complete: function() {
                     self.setProcessingState($submitButton, false);
                 }
             });
-            
-            return false;
         },
 
         processPayment: function($form) {
@@ -441,14 +442,14 @@ jQuery(document).ready(function($) {
                             console.log('🎉 Payment completed! Redirecting...');
                             window.location.href = response.data.redirect_url;
                             break;
-                            
+                                
                         case 'pending':
                             if (response.data.gateway === 'mpesa') {
                                 console.log('📱 Starting M-Pesa payment flow...');
                                 self.handleMpesaPayment(response.data);
                             }
                             break;
-                            
+                                
                         case 'failed':
                             console.error('❌ Payment failed:', response.data.message);
                             self.handleError(response.data.message);
@@ -585,103 +586,66 @@ jQuery(document).ready(function($) {
             }
         },
 
-        showError: function(message) {
-            const $error = $('<div>', {
-                class: 'donation-error',
+        showError: function(fieldId, message) {
+            // Guard against invalid input
+            if (!fieldId || !message) {
+                console.warn('Invalid parameters passed to showError');
+                return;
+            }
+
+            // Find the field and its container
+            const $field = $('#' + fieldId);
+            if (!$field.length) {
+                console.warn('Field not found:', fieldId);
+                return;
+            }
+
+            // Find the appropriate container
+            const $container = $field.closest('.input-group, .custom-amount-wrapper');
+            if (!$container.length) {
+                console.warn('Container not found for field:', fieldId);
+                return;
+            }
+
+            // Clear any existing errors
+            this.clearFieldError($field);
+
+            // Add error class and message
+            $container.addClass('has-error');
+            
+            // Create error message element
+            const $errorMessage = $('<div>', {
+                class: 'error-message',
                 text: message
             });
-            
-            // Remove any existing errors
-            $('.donation-error').remove();
-            
-            // Add new error at the top of the form
-            $('#donation-form').prepend($error);
-            
-            // Safely scroll to error
-            const $form = $('.wp-donation-form');
-            if ($form.length) {
-                $('html, body').animate({
-                    scrollTop: $form.offset().top - 20
-                }, 300);
-            }
-        },
 
-        validateDonorDetails: function() {
-            const name = $('#donor_name').val().trim();
-            const email = $('#donor_email').val().trim();
-            const isAnonymous = $('#anonymous_donation').is(':checked');
-            let isValid = true;
-            
-            // Clear previous errors
-            $('.error-message').remove();
-            $('.has-error').removeClass('has-error');
-            
-            if (isAnonymous) {
-                // If anonymous, validation always passes
-                isValid = true;
-            } else {
-                // Validate name
-                if (!name) {
-                    this.showFieldError('donor_name', wpDonationSystem.strings.name_required);
-                    isValid = false;
-                }
+            // Insert error message after the field
+            $field.after($errorMessage);
+
+            try {
+                // Only scroll if the container is not visible in viewport
+                const containerTop = $container.offset().top;
+                const scrollTop = $(window).scrollTop();
+                const windowHeight = $(window).height();
                 
-                // Validate email
-                if (!email) {
-                    this.showFieldError('donor_email', wpDonationSystem.strings.email_required);
-                    isValid = false;
-                } else if (!this.isValidEmail(email)) {
-                    this.showFieldError('donor_email', wpDonationSystem.strings.invalid_email);
-                    isValid = false;
+                if (containerTop < scrollTop || containerTop > (scrollTop + windowHeight)) {
+                    $('html, body').animate({
+                        scrollTop: Math.max(0, containerTop - 100)
+                    }, 300);
                 }
+            } catch (e) {
+                console.warn('Error scrolling to error message:', e);
             }
-            
-            // Enable/disable next button based on validation
-            const $nextButton = $('.form-step[data-step="2"] .next-step');
-            $nextButton.prop('disabled', !isValid);
-            
-            if (isValid) {
-                this.updateSummary();
-            }
-            
-            return isValid;
-        },
 
-        showFieldError: function(fieldId, message) {
-            const $field = $('#' + fieldId);
-            const $group = $field.closest('.input-group');
-            
-            if (!$field.length || !$group.length) {
-                return; // Exit if field or group not found
-            }
-            
-            // Remove any existing errors first
-            this.clearFieldError($field);
-            
-            // Add error class and message
-            $group.addClass('has-error');
-            $field.after('<div class="error-message">' + message + '</div>');
-            
-            // Only scroll if this is the first error
-            const $firstError = $('.has-error').first();
-            if ($firstError.length && $firstError.is($group)) {
-                try {
-                    const offset = $group.offset();
-                    if (offset) {
-                        $('html, body').animate({
-                            scrollTop: offset.top - 100
-                        }, 300);
-                    }
-                } catch (e) {
-                    console.warn('Could not scroll to error field:', e);
-                }
+            // Focus the field if possible
+            if ($field.is(':visible')) {
+                $field.focus();
             }
         },
 
-        clearFieldError: function($field) {
-            const $group = $field.closest('.input-group');
-            $group.removeClass('has-error');
-            $group.find('.error-message').remove();
+        clearErrors: function() {
+            $('.has-error').removeClass('has-error');
+            $('.error-message').remove();
         },
 
         isValidEmail: function(email) {
@@ -692,14 +656,21 @@ jQuery(document).ready(function($) {
             const self = DonationForm;
             const $radio = $(this);
             
-            // Update submit button text
-            const amount = self.formatCurrency(self.getSelectedAmount());
+            // Get amount and format it
+            const amount = self.getSelectedAmount();
+            if (!amount) {
+                console.warn('No amount selected');
+                return;
+            }
+            
+            const formattedAmount = self.formatCurrency(amount);
             const gatewayTitle = $radio.siblings('.payment-label').find('.payment-name').text();
             
+            // Update button text
             $('.submit-donation .button-text').text(
                 wpDonationSystem.strings.pay_with
+                    .replace('{amount}', formattedAmount)
                     .replace('{gateway}', gatewayTitle)
-                    .replace('{amount}', amount)
             );
         },
 
@@ -720,32 +691,152 @@ jQuery(document).ready(function($) {
         },
 
         handleAnonymousToggle: function() {
-            const self = DonationForm;
-            const isAnonymous = $(this).is(':checked');
             const $nameField = $('#donor_name');
             const $emailField = $('#donor_email');
-            const siteDomain = window.location.hostname;
+            const isAnonymous = $('#anonymous_donation').is(':checked');
             
             if (isAnonymous) {
                 // Store original values
-                $nameField.data('original-value', $nameField.val());
-                $emailField.data('original-value', $emailField.val());
+                $nameField.data('original-name', $nameField.val());
+                $emailField.data('original-email', $emailField.val());
                 
                 // Set anonymous values
                 $nameField.val('Anonymous Guest').prop('readonly', true);
-                $emailField.val('anonymous@' + siteDomain).prop('readonly', true);
-            } else {
-                // Restore original values if they exist
-                const originalName = $nameField.data('original-value');
-                const originalEmail = $emailField.data('original-value');
+                $emailField.val('anonymous@' + window.location.hostname).prop('readonly', true);
                 
-                $nameField.val(originalName || '').prop('readonly', false);
-                $emailField.val(originalEmail || '').prop('readonly', false);
+                // Add visual indication
+                $nameField.closest('.input-group').addClass('anonymous-input');
+                $emailField.closest('.input-group').addClass('anonymous-input');
+            } else {
+                // Restore original values
+                const originalName = $nameField.data('original-name') || '';
+                const originalEmail = $emailField.data('original-email') || '';
+                
+                $nameField.val(originalName).prop('readonly', false);
+                $emailField.val(originalEmail).prop('readonly', false);
+                
+                // Remove visual indication
+                $nameField.closest('.input-group').removeClass('anonymous-input');
+                $emailField.closest('.input-group').removeClass('anonymous-input');
             }
             
-            // Update validation and summary
-            self.validateDonorDetails();
-            self.updateSummary();
+            // Update validation state
+            this.validateDonorDetails();
+            
+            // Trigger change event on fields to update any dependent UI
+            $nameField.trigger('change');
+            $emailField.trigger('change');
+        },
+
+        goToStep: function(step) {
+            $('.form-step').removeClass('active').hide();
+            $('.form-step[data-step="' + step + '"]').addClass('active').fadeIn();
+            
+            // Update progress indicator
+            $('.progress-steps .step').removeClass('active completed');
+            $('.progress-steps .step').each(function() {
+                const stepNum = $(this).data('step');
+                if (stepNum < step) {
+                    $(this).addClass('completed');
+                } else if (stepNum === step) {
+                    $(this).addClass('active');
+                }
+            });
+            
+            // Update summary if needed
+            this.updateSummary();
+        },
+
+        validateDonorDetails: function() {
+            let isValid = true;
+            const isAnonymous = $('#anonymous_donation').is(':checked');
+            
+            if (!isAnonymous) {
+                const name = $('#donor_name').val().trim();
+                const email = $('#donor_email').val().trim();
+                
+                if (!name) {
+                    this.showFieldError('donor_name', wpDonationSystem.strings.name_required);
+                    isValid = false;
+                }
+                
+                if (!email) {
+                    this.showFieldError('donor_email', wpDonationSystem.strings.email_required);
+                    isValid = false;
+                } else if (!this.isValidEmail(email)) {
+                    this.showFieldError('donor_email', wpDonationSystem.strings.invalid_email);
+                    isValid = false;
+                }
+            }
+            
+            return isValid;
+        },
+
+        showFieldError: function(fieldId, message) {
+            const $field = $('#' + fieldId);
+            const $group = $field.closest('.input-group');
+            
+            // Remove any existing errors first
+            this.clearFieldError($field);
+            
+            // Add error class and message
+            $group.addClass('has-error');
+            $field.after('<div class="error-message">' + message + '</div>');
+        },
+
+        clearFieldError: function($field) {
+            const $group = $field.closest('.input-group');
+            $group.removeClass('has-error');
+            $group.find('.error-message').remove();
+        },
+
+        // Add helper method to check element visibility
+        isElementInViewport: function($el) {
+            if (!$el.length) return false;
+
+            const rect = $el[0].getBoundingClientRect();
+            
+            return (
+                rect.top >= 0 &&
+                rect.left >= 0 &&
+                rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+            );
+        },
+
+        // Add new method for payment-specific errors
+        showPaymentError: function(message) {
+            const $paymentSection = $('.payment-methods-section');
+            
+            // Clear any existing errors
+            this.clearErrors();
+            
+            // Add error class to the payment section
+            $paymentSection.addClass('has-error');
+            
+            // Create and insert error message
+            const $errorMessage = $('<div>', {
+                class: 'error-message',
+                text: message
+            });
+            
+            // Insert at the top of the payment section
+            $paymentSection.prepend($errorMessage);
+            
+            // Scroll to payment section if not in viewport
+            try {
+                const sectionTop = $paymentSection.offset().top;
+                const scrollTop = $(window).scrollTop();
+                const windowHeight = $(window).height();
+                
+                if (sectionTop < scrollTop || sectionTop > (scrollTop + windowHeight)) {
+                    $('html, body').animate({
+                        scrollTop: Math.max(0, sectionTop - 100)
+                    }, 300);
+                }
+            } catch (e) {
+                console.warn('Error scrolling to payment section:', e);
+            }
         }
     };
 

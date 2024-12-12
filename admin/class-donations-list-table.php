@@ -10,6 +10,7 @@ if (!class_exists('WP_List_Table')) {
 class WP_Donation_System_List_Table extends WP_List_Table {
     private $logger;
     private $currency;
+    private $settings_manager;
 
     public function __construct() {
         parent::__construct([
@@ -20,8 +21,11 @@ class WP_Donation_System_List_Table extends WP_List_Table {
 
         require_once WP_DONATION_SYSTEM_PATH . 'includes/class-logger.php';
         require_once WP_DONATION_SYSTEM_PATH . 'includes/class-currency.php';
+        require_once WP_DONATION_SYSTEM_PATH . 'includes/class-settings-manager.php';
+        
         $this->logger = new WP_Donation_System_Logger();
         $this->currency = new WP_Donation_System_Currency();
+        $this->settings_manager = WP_Donation_System_Settings_Manager::get_instance();
     }
 
     public function prepare_items() {
@@ -35,7 +39,7 @@ class WP_Donation_System_List_Table extends WP_List_Table {
         );
 
         // Build query
-        $table_name = $wpdb->prefix . 'donations';
+        $table_name = $wpdb->prefix . 'donation_system_donations';
         $where_clauses = array('1=1');
         $query_args = array();
 
@@ -149,7 +153,7 @@ class WP_Donation_System_List_Table extends WP_List_Table {
     public function column_default($item, $column_name) {
         switch ($column_name) {
             case 'amount':
-                return $this->currency->format_amount($item->amount, $item->currency);
+                return $this->currency->format($item->amount, $item->currency);
             case 'payment_method':
                 return ucfirst($item->payment_method);
             case 'status':
@@ -341,7 +345,7 @@ class WP_Donation_System_List_Table extends WP_List_Table {
 
         // Delete the donation
         $result = $wpdb->delete(
-            $wpdb->prefix . 'donations',
+            $wpdb->prefix . 'donation_system_donations',
             ['id' => $donation_id],
             ['%d']
         );
@@ -372,7 +376,7 @@ class WP_Donation_System_List_Table extends WP_List_Table {
         $placeholders = implode(',', array_fill(0, count($donation_ids), '%d'));
 
         $donations = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}donations WHERE id IN ($placeholders)",
+            "SELECT * FROM {$wpdb->prefix}donation_system_donations WHERE id IN ($placeholders)",
             $donation_ids
         ));
 
@@ -386,7 +390,7 @@ class WP_Donation_System_List_Table extends WP_List_Table {
 
         $output = fopen('php://output', 'w');
         
-        // Add headers
+        // Add headers with all relevant fields
         fputcsv($output, array(
             'ID',
             'Donor Name',
@@ -397,10 +401,22 @@ class WP_Donation_System_List_Table extends WP_List_Table {
             'Payment Method',
             'Status',
             'Transaction ID',
-            'Date'
+            'Checkout Request ID',
+            'Merchant Request ID',
+            'M-Pesa Receipt',
+            'Is Anonymous',
+            'Is Recurring',
+            'Frequency',
+            'Campaign ID',
+            'UTM Source',
+            'UTM Medium',
+            'UTM Campaign',
+            'IP Address',
+            'Created At',
+            'Completed At'
         ));
 
-        // Add data
+        // Add data for all fields
         foreach ($donations as $donation) {
             fputcsv($output, array(
                 $donation->id,
@@ -412,7 +428,19 @@ class WP_Donation_System_List_Table extends WP_List_Table {
                 $donation->payment_method,
                 $donation->status,
                 $donation->transaction_id,
-                $donation->created_at
+                $donation->checkout_request_id,
+                $donation->merchant_request_id,
+                $donation->mpesa_receipt_number,
+                $donation->is_anonymous ? 'Yes' : 'No',
+                $donation->is_recurring ? 'Yes' : 'No',
+                $donation->frequency,
+                $donation->campaign_id,
+                $donation->utm_source,
+                $donation->utm_medium,
+                $donation->utm_campaign,
+                $donation->ip_address,
+                $donation->created_at,
+                $donation->completed_at
             ));
         }
 
@@ -425,7 +453,7 @@ class WP_Donation_System_List_Table extends WP_List_Table {
      */
     public function get_total_donations() {
         global $wpdb;
-        $count = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}donations");
+        $count = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}donation_system_donations");
         return $count ? (int) $count : 0;
     }
 
@@ -434,8 +462,10 @@ class WP_Donation_System_List_Table extends WP_List_Table {
      */
     public function get_total_amount() {
         global $wpdb;
-        $total = $wpdb->get_var("SELECT SUM(amount) FROM {$wpdb->prefix}donations WHERE status = 'completed'");
-        return $this->currency->format_amount($total ?: 0);
+        $default_currency = $this->settings_manager->get_setting('default_currency', 'general', 'USD');
+        
+        $total = $wpdb->get_var("SELECT SUM(amount) FROM {$wpdb->prefix}donation_system_donations WHERE status = 'completed'");
+        return $this->currency->format($total ?: 0, $default_currency);
     }
 
     /**
@@ -443,18 +473,20 @@ class WP_Donation_System_List_Table extends WP_List_Table {
      */
     public function get_monthly_amount() {
         global $wpdb;
+        $default_currency = $this->settings_manager->get_setting('default_currency', 'general', 'USD');
+        
         $first_day = date('Y-m-01 00:00:00');
         $last_day = date('Y-m-t 23:59:59');
         
         $total = $wpdb->get_var($wpdb->prepare(
-            "SELECT SUM(amount) FROM {$wpdb->prefix}donations 
+            "SELECT SUM(amount) FROM {$wpdb->prefix}donation_system_donations 
             WHERE status = 'completed' 
             AND created_at BETWEEN %s AND %s",
             $first_day,
             $last_day
         ));
         
-        return $this->currency->format_amount($total ?: 0);
+        return $this->currency->format($total ?: 0, $default_currency);
     }
 
     /**
@@ -463,7 +495,7 @@ class WP_Donation_System_List_Table extends WP_List_Table {
     public function get_completed_count() {
         global $wpdb;
         $count = $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}donations WHERE status = 'completed'"
+            "SELECT COUNT(*) FROM {$wpdb->prefix}donation_system_donations WHERE status = 'completed'"
         );
         return $count ? (int) $count : 0;
     }
@@ -473,9 +505,10 @@ class WP_Donation_System_List_Table extends WP_List_Table {
      */
     public function get_pending_count() {
         global $wpdb;
-        return $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}donations WHERE status = 'pending'"
+        $count = $wpdb->get_var(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}donation_system_donations WHERE status = 'pending'"
         );
+        return $count ? (int) $count : 0;
     }
 
     /**
@@ -483,10 +516,12 @@ class WP_Donation_System_List_Table extends WP_List_Table {
      */
     public function get_average_amount() {
         global $wpdb;
+        $default_currency = $this->settings_manager->get_setting('default_currency', 'general', 'USD');
+        
         $avg = $wpdb->get_var(
-            "SELECT AVG(amount) FROM {$wpdb->prefix}donations WHERE status = 'completed'"
+            "SELECT AVG(amount) FROM {$wpdb->prefix}donation_system_donations WHERE status = 'completed'"
         );
-        return $this->currency->format_amount($avg ?: 0);
+        return $this->currency->format($avg ?: 0, $default_currency);
     }
 
     /**
@@ -509,5 +544,102 @@ class WP_Donation_System_List_Table extends WP_List_Table {
         }
         
         return 0;
+    }
+
+    /**
+     * Get donation statistics
+     */
+    public function get_donation_stats() {
+        return [
+            'total' => $this->get_total_donations(),
+            'completed' => $this->get_completed_count(),
+            'pending' => $this->get_pending_count(),
+            'total_amount' => $this->get_total_amount(),
+            'monthly_amount' => $this->get_monthly_amount(),
+            'average_amount' => $this->get_average_amount(),
+            'success_rate' => $this->get_success_rate()
+        ];
+    }
+
+    /**
+     * Display donation statistics
+     */
+    public function display_donation_stats() {
+        $stats = $this->get_donation_stats();
+        $default_currency = $this->settings_manager->get_setting('default_currency', 'general', 'USD');
+            
+        ?>
+        <div class="donation-stats">
+            <div class="stat-box">
+                <span class="dashicons dashicons-chart-bar"></span>
+                <h3><?php echo esc_html($stats['total']); ?></h3>
+                <p><?php _e('Total Donations', 'wp-donation-system'); ?></p>
+            </div>
+            
+            <div class="stat-box">
+                <span class="dashicons dashicons-money-alt"></span>
+                <h3><?php echo esc_html($this->currency->format($stats['total_amount'], $default_currency)); ?></h3>
+                <p><?php _e('Total Amount', 'wp-donation-system'); ?></p>
+            </div>
+            
+            <div class="stat-box">
+                <span class="dashicons dashicons-calendar"></span>
+                <h3><?php echo esc_html($this->currency->format($stats['monthly_amount'], $default_currency)); ?></h3>
+                <p><?php _e('This Month', 'wp-donation-system'); ?></p>
+            </div>
+            
+            <div class="stat-box">
+                <span class="dashicons dashicons-yes-alt"></span>
+                <h3><?php echo esc_html($stats['completed']); ?></h3>
+                <p><?php _e('Completed', 'wp-donation-system'); ?></p>
+            </div>
+            
+            <div class="stat-box">
+                <span class="dashicons dashicons-clock"></span>
+                <h3><?php echo esc_html($stats['pending']); ?></h3>
+                <p><?php _e('Pending', 'wp-donation-system'); ?></p>
+            </div>
+            
+            <div class="stat-box">
+                <span class="dashicons dashicons-chart-area"></span>
+                <h3><?php echo esc_html($this->currency->format($stats['average_amount'], $default_currency)); ?></h3>
+                <p><?php _e('Average', 'wp-donation-system'); ?></p>
+            </div>
+            
+            <div class="stat-box">
+                <span class="dashicons dashicons-performance"></span>
+                <h3><?php echo esc_html($stats['success_rate']); ?>%</h3>
+                <p><?php _e('Success Rate', 'wp-donation-system'); ?></p>
+            </div>
+        </div>
+        <?php
+    }
+
+    // For getting donations with filters
+    protected function get_donations($per_page, $page_number) {
+        $query = WP_Donation_System_Donation::query();
+        
+        // Add search filter
+        if (!empty($_REQUEST['s'])) {
+            $search = sanitize_text_field($_REQUEST['s']);
+            $query->where('donor_name', 'LIKE', "%{$search}%")
+                  ->orWhere('donor_email', 'LIKE', "%{$search}%");
+        }
+        
+        // Add status filter
+        if (!empty($_REQUEST['status'])) {
+            $query->where('status', sanitize_text_field($_REQUEST['status']));
+        }
+        
+        // Add ordering
+        $orderby = !empty($_REQUEST['orderby']) ? $_REQUEST['orderby'] : 'created_at';
+        $order = !empty($_REQUEST['order']) ? $_REQUEST['order'] : 'DESC';
+        $query->orderBy($orderby, $order);
+        
+        // Add pagination
+        $query->limit($per_page)
+              ->offset(($page_number - 1) * $per_page);
+        
+        return $query->get();
     }
 } 

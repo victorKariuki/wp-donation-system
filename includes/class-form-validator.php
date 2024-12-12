@@ -104,4 +104,30 @@ class WP_Donation_System_Form_Validator {
          */
         return apply_filters('wp_donation_sanitize_form_data', $clean, $data);
     }
+
+    /**
+     * Validate donation form data
+     *
+     * @param array $data Form data to validate
+     * @return true|array True if valid, array of errors if invalid
+     */
+    public function validate_donation_form($data) {
+        $errors = [];
+        $settings_manager = WP_Donation_System_Settings_Manager::get_instance();
+        $minimum_donation = floatval($settings_manager->get_setting('minimum_donation', 'general', '0'));
+
+        // Validate amount
+        if (!isset($data['amount']) || !is_numeric($data['amount'])) {
+            $errors['amount'] = __('Please enter a valid donation amount.', 'wp-donation-system');
+        } elseif ($minimum_donation > 0 && floatval($data['amount']) < $minimum_donation) {
+            $errors['amount'] = sprintf(
+                __('The minimum donation amount is %s.', 'wp-donation-system'),
+                (new WP_Donation_System_Currency())->format($minimum_donation)
+            );
+        }
+
+        // Rest of the validation code...
+        
+        return $errors;
+    }
 } 

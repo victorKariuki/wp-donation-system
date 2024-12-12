@@ -4,6 +4,12 @@ if (!defined('ABSPATH')) {
 }
 
 global $donation_message, $donation_type;
+
+// Initialize the list table
+$donations_table = new WP_Donation_System_List_Table();
+
+// Get statistics
+$stats = $donations_table->get_donation_stats();
 ?>
 
 <div class="wrap">
@@ -27,21 +33,21 @@ global $donation_message, $donation_type;
             <div class="stat-card total-donations">
                 <div class="stat-icon">📊</div>
                 <div class="stat-content">
-                    <span class="stat-value"><?php echo number_format_i18n($donations_table->get_total_donations()); ?></span>
+                    <span class="stat-value"><?php echo esc_html(number_format_i18n($stats['total'])); ?></span>
                     <span class="stat-label"><?php _e('Total Donations', 'wp-donation-system'); ?></span>
                 </div>
             </div>
             <div class="stat-card total-amount">
                 <div class="stat-icon">💰</div>
                 <div class="stat-content">
-                    <span class="stat-value"><?php echo $donations_table->get_total_amount(); ?></span>
+                    <span class="stat-value"><?php echo esc_html($stats['total_amount']); ?></span>
                     <span class="stat-label"><?php _e('Total Amount', 'wp-donation-system'); ?></span>
                 </div>
             </div>
             <div class="stat-card monthly-amount">
                 <div class="stat-icon">📅</div>
                 <div class="stat-content">
-                    <span class="stat-value"><?php echo $donations_table->get_monthly_amount(); ?></span>
+                    <span class="stat-value"><?php echo esc_html($stats['monthly_amount']); ?></span>
                     <span class="stat-label"><?php _e('This Month', 'wp-donation-system'); ?></span>
                 </div>
             </div>
@@ -49,27 +55,27 @@ global $donation_message, $donation_type;
 
         <!-- Secondary Stats -->
         <div class="stats-row secondary-stats">
-            <div class="stat-card">
+            <div class="stat-card completed">
                 <div class="stat-content">
-                    <span class="stat-value"><?php echo $donations_table->get_completed_count(); ?></span>
+                    <span class="stat-value"><?php echo esc_html(number_format_i18n($stats['completed'])); ?></span>
                     <span class="stat-label"><?php _e('Completed', 'wp-donation-system'); ?></span>
                 </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card pending">
                 <div class="stat-content">
-                    <span class="stat-value"><?php echo $donations_table->get_pending_count(); ?></span>
+                    <span class="stat-value"><?php echo esc_html(number_format_i18n($stats['pending'])); ?></span>
                     <span class="stat-label"><?php _e('Pending', 'wp-donation-system'); ?></span>
                 </div>
             </div>
             <div class="stat-card">
                 <div class="stat-content">
-                    <span class="stat-value"><?php echo $donations_table->get_average_amount(); ?></span>
+                    <span class="stat-value"><?php echo esc_html($stats['average_amount']); ?></span>
                     <span class="stat-label"><?php _e('Average', 'wp-donation-system'); ?></span>
                 </div>
             </div>
             <div class="stat-card">
                 <div class="stat-content">
-                    <span class="stat-value"><?php echo $donations_table->get_success_rate(); ?>%</span>
+                    <span class="stat-value"><?php echo esc_html(number_format_i18n($stats['success_rate'])); ?>%</span>
                     <span class="stat-label"><?php _e('Success Rate', 'wp-donation-system'); ?></span>
                 </div>
             </div>
@@ -99,6 +105,9 @@ global $donation_message, $donation_type;
                 <option value="mpesa" <?php selected(isset($_GET['payment_method']) ? $_GET['payment_method'] : '', 'mpesa'); ?>>
                     <?php _e('M-Pesa', 'wp-donation-system'); ?>
                 </option>
+                <option value="paypal" <?php selected(isset($_GET['payment_method']) ? $_GET['payment_method'] : '', 'paypal'); ?>>
+                    <?php _e('PayPal', 'wp-donation-system'); ?>
+                </option>
             </select>
 
             <input type="date" name="start_date" value="<?php echo isset($_GET['start_date']) ? esc_attr($_GET['start_date']) : ''; ?>" placeholder="<?php _e('Start Date', 'wp-donation-system'); ?>">
@@ -110,6 +119,26 @@ global $donation_message, $donation_type;
             </a>
         </form>
     </div>
+
+    <!-- Debug Information -->
+    <?php if (WP_DEBUG): ?>
+    <div class="debug-info" style="background: #f8f9fa; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <h3>Debug Information</h3>
+        <pre><?php
+            echo "Total Donations: " . $stats['total'] . "\n";
+            echo "Completed: " . $stats['completed'] . "\n";
+            echo "Pending: " . $stats['pending'] . "\n";
+            echo "Total Amount: " . $stats['total_amount'] . "\n";
+            echo "Monthly Amount: " . $stats['monthly_amount'] . "\n";
+            echo "Average Amount: " . $stats['average_amount'] . "\n";
+            echo "Success Rate: " . $stats['success_rate'] . "%\n";
+            
+            global $wpdb;
+            echo "\nLast SQL Query: " . $wpdb->last_query . "\n";
+            echo "Last SQL Error: " . $wpdb->last_error;
+        ?></pre>
+    </div>
+    <?php endif; ?>
 
     <!-- Donations List -->
     <form id="donations-filter" method="post">
